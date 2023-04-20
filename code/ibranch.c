@@ -85,7 +85,7 @@ branch_data_t *initialize_branch_data(glp_tree *t, env_t *env) {
     if (data_parent != NULL) {
         int branching_variable = data_parent->branch_data.branching_variable;
         branch_data->branching_value = 
-            glp_get_col_prim(glp_ios_get_prob(t), branching_variable);
+	  glp_get_col_prim(glp_ios_get_prob(t), branching_variable);
         int branching_class = index_to_class(branching_variable, samples);
         branch_data->directional_cnt[branching_class] += primary;
     }
@@ -131,6 +131,13 @@ void branch_on(int index, glp_tree *t, env_t *env) {
     if (glp_ios_can_branch(t, branching_variable)) {
         #ifdef EXPERIMENTAL
             glp_printf("branch from %i on %i\n", curr_node, branching_variable);
+	    double val = glp_get_col_prim(glp_ios_get_prob(t), branching_variable);
+	    glp_printf("branching var has value %0.3f\n", val);
+	    if(val == 0 || val == 1) {
+	      printf("VALUE = %0.3f\n", val);
+	      exit(0);
+	    }
+
         #endif
         glp_ios_branch_upon(t, branching_variable, branch_data->direction); 
     }
@@ -276,18 +283,18 @@ void branch_closest(glp_tree *t, env_t *env) {
     samples_t *samples = env->samples;
 	int idx_max = violation_idx(0, samples);
 	for (int i = 1; i < idx_max; i++) {
-		if (!glp_ios_can_branch(t, i)) {
-            continue;
-        }
-        double value = glp_get_col_prim(p, i);
-        if (index_label(i, samples) > 0) {
-            value = 1. - value;
-        }
-        value = fabs(value - branch_target);
-        if (value <= candidate_frac) {
-            candidate_frac = value;
-            candidate_idx = i;
-		}
+	  if (!glp_ios_can_branch(t, i)) {
+	    continue;
+	  }
+	  double value = glp_get_col_prim(p, i);
+	  if (index_label(i, samples) > 0) {
+	    value = 1. - value;
+	  }
+	  value = fabs(value - branch_target);
+	  if (value <= candidate_frac) {
+	    candidate_frac = value;
+	    candidate_idx = i;
+	  }
 	}
 	branch_on(candidate_idx, t, env);
 }
@@ -425,6 +432,7 @@ void branch_by_violation(glp_tree *t, env_t *env) {
         glp_printf("branching variable: ");
     #endif
     for (int i = violation_start; i < samples_cnt; i++) {
+    //for (int i = samples_cnt-1; i >= violation_start; i--) {
         int idx = violation_index[i];
         if (!idx) {
             #ifdef EXPERIMENTAL
@@ -445,6 +453,7 @@ void branch_by_violation(glp_tree *t, env_t *env) {
             default_idx = idx;
             sample_locator_t *loc = locator(idx, samples);
             int interdiction = is_interdicted(interdiction_lp, loc, env);
+	    //int interdiction = 0;
             free(loc);
             #ifdef EXPERIMENTAL
                 glp_printf("(%i) ", interdiction);
@@ -507,20 +516,20 @@ void branch_even(glp_tree *t, env_t *env) {
 
 void ibranch(glp_tree *t, env_t *env) {
     initialize_branch_data(t, env);
-	// glp_printf("Chosen node (at ibranch)  %i\n", glp_ios_curr_node(t));
+    // glp_printf("Chosen node (at ibranch)  %i\n", glp_ios_curr_node(t));
     /*
     node_data_t *data = glp_ios_node_data(t, glp_ios_curr_node(t));
     if (data->branch_data.initialized) {
         glp_printf("rebranching\n");
     }*/
-	/*
-	ibranch_LFV(t, env); 
-	*/
-	// random_flat(t, env); 
-	// branch_even(t, env); 
-	// branch_closest(t, env);
-	branch_by_violation(t, env);
-	return;
+        
+    //ibranch_LFV(t, env); 
+        
+    //random_flat(t, env); 
+    //branch_even(t, env); 
+    //branch_closest(t, env);
+    branch_by_violation(t, env);
+    return;
 
 	/* Choice of branching index: try high rank first, and if that
 	 * fails move one to random flat (which then becomes the next ranked

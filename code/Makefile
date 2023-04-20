@@ -1,5 +1,7 @@
 CC = gcc
 
+DEV = true
+
 ifdef DEV
   CFLAGS = -g -Wall -fprofile-arcs -ftest-coverage
 else
@@ -8,6 +10,7 @@ endif
 
 INC = $(GUROBI_HOME)/include/
 LIBS = -L$(GUROBI_HOME)/lib -lgurobi95 -lglpk -lm
+#LIBS = -L$(GUROBI_HOME)/lib -lgurobi100 -lglpk -lm
 BASE = widereach.h helper.h general.h glpk.h Makefile
 OBJ = samples.o sparse_vector.o env.o indexing.o glpk.o params.o callback.o \
       iheur.o ibranch.o iselect.o irowgen.o solution_data.o ibingo.o \

@@ -177,7 +177,7 @@ void iheur(glp_tree *t, env_t *env) {
 
 	int status = glp_ios_heur_sol(t, solution);
 	if (!status) {
-		print_solution(violation_idx(0, samples), solution, p);
+	  //print_solution(violation_idx(0, samples), solution, p);
 		traverse(solution, t, env);
         int *violation_indexes = sorted_by_violation(solution + 1, env);
         update_solution(solution_data, solution, value, violation_indexes);

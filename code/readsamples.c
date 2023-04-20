@@ -1,5 +1,6 @@
 #include "widereach.h"
 #include "helper.h"
+#include <math.h>
 
 double *read_vector(FILE *infile, size_t dimension) {
     double *sample = CALLOC(dimension, double);
@@ -15,7 +16,7 @@ void read_class(FILE *infile, samples_t *samples, int class) {
     size_t count = samples->count[class];
     double **s = samples->samples[class] = CALLOC(count, double *);
     for (size_t i = 0; i < count; i++) {
-        s[i] = read_vector(infile, samples->dimension); 
+        s[i] = read_vector(infile, samples->dimension);
     }
 }
 

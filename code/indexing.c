@@ -99,6 +99,40 @@ double label_to_penalty(int label, double theta) {
 	return label > 0 ? theta - 1. : theta;
 }
 
+int idx_thr(int direction, int class, size_t sample_index, samples_t *samples) { 
+	int idx = (int) sample_index + 1;
+	idx = directional_offset(idx, direction, samples->dimension);
+	idx += positives(samples) + negatives(samples);
+	if (samples->label[class] < 0) {
+		idx += positives(samples);
+	}
+	return idx;
+}
+
+sparse_vector_t *cover_row_thr(
+		sparse_vector_t *constraint, 
+		size_t class, 
+		double coef, 
+		samples_t *samples) {
+	int count = samples->count[class];
+	for (size_t i = 0; i < count; i++) { 
+		append(constraint, idx_thr(0, class, i, samples), coef);
+	}
+	return constraint;
+}
+
+sparse_vector_t *precision_row_thr(samples_t *samples, double theta) {
+	size_t len = samples_total(samples) + 2;
+	sparse_vector_t *constraint = sparse_vector_blank(len);
+	size_t class_cnt = samples->class_cnt;
+	for (size_t class = 0; class < class_cnt; class++) {
+		double penalty = label_to_penalty(samples->label[class], theta);
+		cover_row_thr(constraint, class, penalty, samples);
+	}
+	append(constraint, violation_idx(0, samples), -1.);
+	return constraint;
+}
+
 sparse_vector_t *precision_row(samples_t *samples, double theta) {
 	size_t len = samples_total(samples) + 2;
 	sparse_vector_t *constraint = sparse_vector_blank(len);
@@ -122,7 +156,6 @@ sparse_vector_t *cover_row(
 	}
 	return constraint;
 }
-
 
 int index_to_class(int idx, samples_t *samples) {
 	sample_locator_t *loc = locator(idx, samples);
@@ -219,7 +252,7 @@ double hyperplane_to_solution_parts(
   double value = 0.;
   for (int i = idx_min; i < idx_max; i++) {
     sample_locator_t *loc = locator(i, samples);
-    int class = loc->class;        
+    int class = loc->class;
     double v = side(loc, samples, hyperplane, precision[class]);
     free(loc);
     update_solution_element(solution, i, v);

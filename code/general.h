@@ -571,6 +571,15 @@ sparse_vector_t *precision_row(
 		/** Precision threshold */
 		double theta);
 
+/** Returns a new sparse vector representing the left hand side of the 
+ * precision constraint, for thresholded vars */
+sparse_vector_t *precision_row_thr(
+		/** Sample set */
+		samples_t *, 
+		/** Precision threshold */
+		double theta);
+
+
 /** Finds and return the class of the given GLPK decision variable */
 int index_to_class(int idx, samples_t *);
 

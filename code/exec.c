@@ -14,6 +14,10 @@ double *single_run(unsigned int *seed, int tm_lim, env_t *env) {
     glp_scale_prob(p, GLP_SF_AUTO);
     glp_simplex(p, NULL);
 
+    /*double *r = solution_values(p);
+    r[0] = glp_get_obj_val(p);
+    return r;*/
+
     glp_iocp *parm = iocp(env);
     parm->tm_lim = tm_lim;
     parm->bt_tech = GLP_BT_DFS;
@@ -26,6 +30,10 @@ double *single_run(unsigned int *seed, int tm_lim, env_t *env) {
     free(parm);
 
     double *result = solution_values_mip(p);
+    printf("RESULT: \n");
+    for(int i = 0; i < 10; i++) {
+      printf("%0.3f\n", result[i]);
+    }
     /* size_t dimension = samples->dimension;
     double *result = CALLOC(dimension + 2, double);
     double *h = hyperplane(p, samples);
@@ -41,7 +49,7 @@ double *single_run(unsigned int *seed, int tm_lim, env_t *env) {
     }*/
 
     glp_delete_prob(p);
-    free(delete_solution_data(env->solution_data));
+    //free(delete_solution_data(env->solution_data));
     
     return result;
 }

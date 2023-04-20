@@ -6,6 +6,6 @@ env_t *delete_env(env_t *env) {
     if (solution_data != NULL) {
         free(delete_solution_data(env->solution_data));
     }
-	free(env->params);
+    free(env->params);
 	return env;
 }

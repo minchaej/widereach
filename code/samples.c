@@ -86,12 +86,12 @@ samples_t *random_samples(
 
 void print_sample(sample_locator_t loc, samples_t *samples) {
 	size_t class = loc.class;
-	glp_printf("%i ", samples->label[class]);
+	glp_printf("%i, ", samples->label[class]);
 
 	double *sample = samples->samples[class][loc.index];
 	size_t dimension = samples->dimension;
 	for (size_t j = 0; j < dimension; j++) {
-		glp_printf("%g ", sample[j]);
+		glp_printf("%g, ", sample[j]);
 	}
 	glp_printf("\n");
 
