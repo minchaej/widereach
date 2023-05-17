@@ -30,6 +30,8 @@ typedef struct gurobi_param {
   double ImproveStartGap;
   double ImproveStartTime;
   int VarBranch;
+  double Heuristics;
+  int Cuts;
 } gurobi_param;
 
 /** Launch a single experiment 
@@ -47,5 +49,13 @@ double *single_gurobi_run(
   /** Time limit in milliseconds for tuning the model */
   int tm_lim_tune, 
   env_t *,
-  double *,
   gurobi_param *);
+
+/** Random hyperplane callback for gurobi */
+int backgroundHyperplanes(GRBmodel *, void *, int, void *);
+
+void startHyperplanes(env_t *, GRBmodel *);
+void stopHyperplanes();
+void feature_scaling(env_t *);
+
+int gurobi_callback(GRBmodel *, void *, int, void *);

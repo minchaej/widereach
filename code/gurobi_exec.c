@@ -10,9 +10,6 @@
       NULL)
   
 #define MSG_LEN 256
-
-#define FREQ 1000
-#define LIM 500
   
 int error_handle(int state, GRBmodel *model, char *step) {
   if (!state) {
@@ -108,208 +105,16 @@ double *gurobi_relax(unsigned int *seed, int tm_lim, int tm_lim_tune, env_t *env
     free(vtypes);
     return result;
 }
-int ncalls = 0;
-int testCB(GRBmodel *model, void *cbdata, int where, void *usrdata) {
-  if(where != GRB_CB_MIPNODE) return 0;
-  if(ncalls++ % 5000 != 0) return 0;
-  int nvars;
-  int state;
-  state = GRBgetintattr(model, GRB_INT_ATTR_NUMVARS, &nvars);
-  double *soln = CALLOC(nvars, double);
-  state = GRBcbget(cbdata, where, GRB_CB_MIPNODE_REL, soln);
-  /*printf("STATE = %d\n", state);
-  printf("ERROR: %s STOP\n", GRBgeterrormsg(GRBgetenv(model)));
-  printf("------RELAXATION SOLUTION: %0.3f %0.3f %0.3f-------\n", soln[0], soln[1], soln[2]);*/
-  printf("----------------------------\nRelaxation Solution:\n");
-  for(int i = 0; i < nvars; i++)
-    printf("%0.3f ", soln[i]);
-  printf("\n----------------------------\n");
-  free(soln);
-  return 0;
-}
 
-int test_heur(GRBmodel *model, void *cbdata, int where, void *usrdata) {
-  if(where != GRB_CB_MIPNODE) return 0;
-  int nvars;
-  int state;
-  env_t *env = usrdata;
-  state = GRBgetintattr(model, GRB_INT_ATTR_NUMVARS, &nvars);
-  double *h = CALLOC(nvars, double); //relaxation solution
-  state = GRBcbget(cbdata, where, GRB_CB_MIPNODE_REL, h);
-  double *solution = blank_solution(env->samples);
-  double obj = hyperplane_to_solution(h, solution, env);
-  state = GRBcbsolution(cbdata, solution, NULL);
-  int r = reach(solution, env->samples);
-  double p = precision(solution, env->samples);
-  printf("[HEUR] Solution with obj = %0.3f. Reach = %d, prec = %0.3f\n", obj, r, p);
-  /*printf("       Hyperplane: ");
-  for(int i = 0; i < env->samples->dimension+1; i++) printf("%0.3f ", h[i]);
-  printf("\n");*/
-  free(h);
-  free(solution);
-  return 0;
-}
+int nrels = 0;
+int nfeas = 0;
 
-int modified = 0;
-int k = 0;
-int modified_branching(GRBmodel *model, void *cbdata, int where, void *usrdata) {
-  if(where != GRB_CB_MIPSOL) return 0;
-  if(k++ < 10) return 0;
-  int state;
-  GRBterminate(model);
-  //state = GRBsetintattrelement(model, GRB_INT_ATTR_BRANCHPRIORITY, 30, 1);
-  modified = 1;
-  k = 0;
-  //printf("state = %d\n", state);
-  return state;
-}
-
-int gurobi_random_bounded(int *branched, int idx_min, int idx_max) {
-  int *eligible = CALLOC(idx_max - idx_min + 1, int);
-  int eligible_cnt = 0;
-  for (int i = idx_min; i <= idx_max; i++) {
-    if (!branched[i]) {
-      eligible[eligible_cnt++] = i;
-    }
-  }
-  int candidate = eligible_cnt > 0 ? eligible[lrand48() % eligible_cnt] : -1;
-  free(eligible);
-  return candidate;
-}
-
-typedef struct pair_t {
-  int key;
-  double val;
-} pair_t;
-
-int cmppairs(const void *a, const void *b) {
-  return ((pair_t *) a)->val > ((pair_t *) b)->val;
-}
-
-/* Returns an array containing the num closest samples to the hyperplane
- * This can be done faster (linear time) using order statistics */
-int *gurobi_by_violation(env_t *env, double *sol, int num) {
-  int *cands = CALLOC(num, int);
-  double branch_target = env->params->branch_target;
-  double max_frac = -__DBL_MAX__;
-  int max_idx = -1;
-  samples_t *samples = env->samples;
-  int idx_max = violation_idx(0, samples);
-  pair_t *pairs = CALLOC(idx_max, pair_t);
-  for (int i = samples->dimension+2; i < idx_max; i++) {
-    //double value = glp_get_col_prim(p, i);
-    double value = sol[i];
-    if (index_label(i, samples) > 0) {
-      value = 1. - value;
-    }
-    value = fabs(value - branch_target);
-    pairs[i] = (pair_t) {i, value};
-  }
-  qsort(pairs, idx_max, sizeof(pair_t), cmppairs);
-  for(int i = 0; i < num; i++)
-    cands[i] = pairs[i].key;
-  free(pairs);
-  return cands;
-}
-
-double *incumb;
-int modified_rins(GRBmodel *parent_model, void *cbdata, int where, void *usrdata) {
-  env_t *env = usrdata;
-  if(where == GRB_CB_MIPSOL) {
-    int nvars;
-    int state;
-    state = GRBgetintattr(parent_model, GRB_INT_ATTR_NUMVARS, &nvars);
-    if(k++ == 0)
-      incumb = CALLOC(1, double);
-    free(incumb);
-    incumb = CALLOC(nvars, double);
-    state = GRBcbget(cbdata, where, GRB_CB_MIPSOL_SOL, incumb);
-    //env->solution_data->integer_solution = CALLOC(nvars, double);
-    //for(int i = 0; i < nvars; i++)
-    //  env->solution_data->integer_solution[i] = incumb[i];
-    /*for(int i = env->samples->dimension + 2; i < nvars; i++) {
-      printf("incumb[%d] = %0.3f\n", i, incumb[i]);
-      }*/
-    //free(incumb);
-    return state;
-  } if(where == GRB_CB_MIPNODE && k++ % FREQ == 0) {
-    int state = 0;
-    
-    GRBmodel *model = GRBcopymodel(parent_model);
-    //GRBsetcallbackfunc(model, test_heur, usrdata);
-    GRBsetcallbackfunc(model, NULL, NULL);
-    state |= GRBsetintparam(GRBgetenv(model), "RINS", 0);
-    GRBupdatemodel(model);
-  
-    int nvars;
-    state |= GRBgetintattr(model, GRB_INT_ATTR_NUMVARS, &nvars);
-    printf("Got nvars. State = %d\n", state);
-    double *h = CALLOC(nvars, double); //relaxation solution
-    state |= GRBcbget(cbdata, where, GRB_CB_MIPNODE_REL, h);
-    //printf("Got relaxation. State = %d\n", state);
-    if(state == 10005) return 0; //sometimes cannot load relaxation
-    double *solution = blank_solution(env->samples);
-    hyperplane_to_solution(h, solution, env);
-    //double *incumb = env->solution_data->integer_solution;
-    /*for(int i = env->samples->dimension + 2; i < nvars; i++) {
-      if(incumb[i] != 0 && incumb[i] != 1)
-	printf("[HEUR] NON-INTEGER-INCUMBENT: incumb[%d] = %0.3f\n", i, incumb[i]);
-	}*/
-    int common = 0;
-    for(int i = env->samples->dimension + 2; i < nvars; i++) {
-      if(incumb[i] == solution[i]) {
-	//fix value by setting LB and UB to the same value
-	state |= GRBsetdblattrelement(model, "LB", i, incumb[i]);
-	state |= GRBsetdblattrelement(model, "UB", i, incumb[i]);
-	common++;
-      }
-    }
-    printf("Fixed vars. State = %d\n", state);
-
-    if(common == 0) {
-      printf("[HEUR] subproblem identical to original\n");
-      return state;
-    }
-
-    state |= GRBsetdblattrarray(model, GRB_DBL_ATTR_START, 0, nvars, incumb);
-    printf("Set start. State = %d\n", state);
-    /*printf("Incumbent:\n");
-    for(int i =0; i < nvars; i++) {
-      printf("%0.3f%s", incumb[i], (i == nvars - 1) ? "\n" : " ");
-      }*/
-
-
-    state |= GRBsetdblparam(GRBgetenv(model), "NodeLimit", LIM);
-    //state |= GRBsetintparam(GRBgetenv(model), "OutputFlag", 0);
-    printf("State = %d\n", state);
-    printf("[HEUR] STARTING SUBPROBLEM (fixed %d vars):\n", common);
-
-    state |= GRBoptimize(model);
-    printf("State = %d\n", state);
-
-    printf("[HEUR] END SUBPROBLEM\n");
-
-    double *new_sol = CALLOC(nvars, double);
-    state |= GRBgetdblattrarray(model, "X", 0, nvars, new_sol);
-    printf("State = %d\n", state);
-
-    state |= GRBcbsolution(cbdata, new_sol, NULL);
-    //  printf("[HEUR] STATE = %d\n", state);
-    free(h);
-    free(solution);
-    //free(incumb);
-    free(new_sol);
-    GRBfreemodel(model);
-    return state;
-  }
-  return 0;
-}
+double switch_time = -1;
 
 double *single_gurobi_run(unsigned int *seed, 
                           int tm_lim, 
                           int tm_lim_tune, 
                           env_t *env,
-			  double *warm_start,
 			  gurobi_param *param_setting) {
     samples_t *samples = env->samples;
     env->solution_data = solution_data_init(samples_total(samples));
@@ -321,8 +126,6 @@ double *single_gurobi_run(unsigned int *seed,
 
     int state;
     GRBmodel *model;
-
-    ncalls = 0;
     
     TRY_MODEL(model = gurobi_milp(&state, env), "model creation");
 
@@ -368,25 +171,14 @@ double *single_gurobi_run(unsigned int *seed,
     TRY_MODEL(state = GRBtunemodel(model), "autotune");
     int nresults;
     TRY_MODEL(state = GRBgetintattr(model, "TuneResultCount", &nresults), "get tune results");
-    printf("------------%d results--------------\n", nresults);
     if(nresults > 0)
       TRY_MODEL(state = GRBgettuneresult(model, 0), "apply tuning");
       GRBwrite(model, "post.prm");*/
     
-    GRBwrite(model, "tmp.lp");
-
-    
-    if(warm_start) {
-      TRY_MODEL(state = GRBsetintparam(GRBgetenv(model), "Method", 0), "use only simplex");
-      TRY_MODEL(state = GRBsetdblattrarray(model, "Start", 0, nvars, warm_start), "apply relaxation solution");
-      TRY_MODEL(state = GRBsetintparam(GRBgetenv(model), "Presolve", 0), "disable presolve");
-    }
-
-    if(1) {
     printf("Generating best of %d hyperplanes\n", env->params->rnd_trials);
     double *h = best_random_hyperplane(1, env);
     printf("Dimension = %lu\n", env->samples->dimension);
-    for(int i = 0; i < env->samples->dimension+1; i++) h[i] /= 100;
+    //for(int i = 0; i < env->samples->dimension+1; i++) h[i] /= 100;
     //printf("Hyperplane: %0.3f %0.3f %0.3f %0.3f\n", h[0], h[1], h[2], h[3]);
     printf("Hyperplane: ");
     for(int i = 0; i < env->samples->dimension+1; i++)
@@ -395,45 +187,14 @@ double *single_gurobi_run(unsigned int *seed,
     double *random_solution = blank_solution(samples);
     double random_objective_value = hyperplane_to_solution(h, random_solution, env);
     printf("Objective value = %0.3f\n", random_objective_value);
+    printf("Precision = %lg, reach = %u\n", precision(random_solution, samples), reach(random_solution, samples));
 
-    /*int idx_max = violation_idx(0, samples);
-    for(int i = 0; i < idx_max; i++) {
-      //printf("var %d = %0.3f%s\n", i, random_solution[i], (i == idx_max) ? "\n" : " ");
-      char *name = CALLOC(100, char);
-      TRY_MODEL(state = GRBgetstrattrelement(model, "VarName", i, &name), "get var");
-      printf("%s = %0.3f\n", name, random_solution[i]);
-      }*/
-
-    TRY_MODEL(state = GRBsetdblattrarray(model, GRB_DBL_ATTR_START, 0, nvars, random_solution + 1), "set start");
+    TRY_MODEL(state = GRBsetdblattrarray(model, GRB_DBL_ATTR_START, env->samples->dimension+1, nvars-env->samples->dimension-1, random_solution + env->samples->dimension+2), "set start");
 
     free(h);
     free(random_solution);
-    }
-    
 
-    //TRY_MODEL(state = GRBsetintparam(GRBgetenv(model), "CliqueCuts", 2), "set cuts");
-    //TRY_MODEL(state = GRBsetintparam(GRBgetenv(model), "FlowCoverCuts", 2), "set cuts");
-    //TRY_MODEL(state = GRBsetintparam(GRBgetenv(model), "InfProofCuts", 2), "set cuts");
-    //TRY_MODEL(state = GRBsetintparam(GRBgetenv(model), "CoverCuts", 2), "set cuts");
-    //GRBsetintparam(GRBgetenv(model), "GomoryPasses", 0);
-
-    //TRY_MODEL(state = GRBsetcallbackfunc(model, testCB, NULL), "add callback");
-    //TRY_MODEL(state = GRBsetcallbackfunc(model, test_heur, env), "add custom heuristic");
-    //TRY_MODEL(state = GRBsetcallbackfunc(model, modified_rins, env), "add modified RINS heuristic");
-
-    //TRY_MODEL(state = GRBsetcallbackfunc(model, modified_branching, env), "modify branching strategy");
-    //variable hints:
-    if(0) {
-    double *hint = CALLOC(nvars, double);
-    int i;
-    for(i = 0; i <= env->samples->dimension; i++)
-      hint[i] = GRB_UNDEFINED;
-    for(; i <= env->samples->dimension + env->samples->count[1]; i++)
-      hint[i] = 1;
-    for(; i <= env->samples->dimension + env->samples->count[1] + env->samples->count[0]; i++)
-      hint[i] = 0;
-    hint[i] = GRB_UNDEFINED;
-    }
+    TRY_MODEL(state = GRBsetcallbackfunc(model, gurobi_callback, env), "set callback");
     
     if(param_setting) {
       TRY_MODEL(state = GRBsetintparam(GRBgetenv(model), "Threads", param_setting->threads), "set thread limit");
@@ -441,54 +202,8 @@ double *single_gurobi_run(unsigned int *seed,
       TRY_MODEL(state = GRBsetdblparam(GRBgetenv(model), "ImproveStartGap", param_setting->ImproveStartGap), "set start gap");
       TRY_MODEL(state = GRBsetdblparam(GRBgetenv(model), "ImproveStartTime", param_setting->ImproveStartTime), "set start time");
       TRY_MODEL(state = GRBsetintparam(GRBgetenv(model), "VarBranch", param_setting->VarBranch), "set branching strategy");
-      //TRY_MODEL(state = GRBsetdblparam(GRBgetenv(model), "Heuristics", *param_setting/((double) 10)), "set heuristics");
-      //TRY_MODEL(state = GRBsetdblparam(GRBgetenv(model), "Heuristics", 0.1), "set heuristics");
-      /*switch(*param_setting) {
-      case 1:
-	TRY_MODEL(state = GRBsetintparam(GRBgetenv(model), "CliqueCuts", 2), "set cuts");
-	break;
-      case 2:
-	TRY_MODEL(state = GRBsetintparam(GRBgetenv(model), "GomoryPasses", 0), "disable gomory");
-	break;
-      case 3:
-	TRY_MODEL(state = GRBsetintparam(GRBgetenv(model), "FlowCoverCuts", 2), "set cuts");
-	break;
-      case 4:
-	TRY_MODEL(state = GRBsetintparam(GRBgetenv(model), "FlowCoverCuts", 2), "set cuts");
-	TRY_MODEL(state = GRBsetintparam(GRBgetenv(model), "GomoryPasses", 0), "disable gomory");
-	break;
-      case 5:
-	TRY_MODEL(state = GRBsetintparam(GRBgetenv(model), "InfProofCuts", 2), "set cuts");
-	break;
-      case 6:
-	TRY_MODEL(state = GRBsetintparam(GRBgetenv(model), "InfProofCuts", 2), "set cuts");
-	TRY_MODEL(state = GRBsetintparam(GRBgetenv(model), "GomoryPasses", 0), "disable gomory");
-	break;
-      case 7:
-	TRY_MODEL(state = GRBsetintparam(GRBgetenv(model), "CoverCuts", 2), "set cuts");
-	break;
-      case 8:
-	TRY_MODEL(state = GRBsetintparam(GRBgetenv(model), "CoverCuts", 2), "set cuts");
-	TRY_MODEL(state = GRBsetintparam(GRBgetenv(model), "GomoryPasses", 0), "disable gomory");
-	break;
-      case 9:
-	TRY_MODEL(state = GRBsetintparam(GRBgetenv(model), "CoverCuts", 2), "set cuts");
-	TRY_MODEL(state = GRBsetintparam(GRBgetenv(model), "InfProofCuts", 2), "set cuts");
-	TRY_MODEL(state = GRBsetintparam(GRBgetenv(model), "GomoryPasses", 0), "disable gomory");
-	break;
-      case 10:
-	TRY_MODEL(state = GRBsetintparam(GRBgetenv(model), "InfProofCuts", 2), "set cuts");
-	TRY_MODEL(state = GRBsetintparam(GRBgetenv(model), "FlowCoverCuts", 2), "set cuts");
-	TRY_MODEL(state = GRBsetintparam(GRBgetenv(model), "GomoryPasses", 0), "disable gomory");
-	break;
-      case 11:
-	TRY_MODEL(state = GRBsetintparam(GRBgetenv(model), "InfProofCuts", 1), "set cuts");
-	TRY_MODEL(state = GRBsetintparam(GRBgetenv(model), "FlowCoverCuts", 2), "set cuts");
-	TRY_MODEL(state = GRBsetintparam(GRBgetenv(model), "GomoryPasses", 0), "disable gomory");
-	break;
-      default:
-	break;
-	}*/
+      TRY_MODEL(state = GRBsetdblparam(GRBgetenv(model), "Heuristics", param_setting->Heuristics), "set heuristics");
+      TRY_MODEL(state = GRBsetintparam(GRBgetenv(model), "Cuts", param_setting->Cuts), "set cuts");
     }
 
     //TRY_MODEL(state = GRBsetdblparam(GRBgetenv(model), "NodeLimit", 0), "set node limit");
@@ -501,13 +216,26 @@ double *single_gurobi_run(unsigned int *seed,
     int dimension = env->samples->dimension;
     int *branched = CALLOC(nvars, int);
 
-    do {
+    //TRY_MODEL(state = GRBsetintparam(GRBgetenv(model), "Threads", 16), "set thread limit");
+    //startHyperplanes(env, model);
+    //TRY_MODEL(state = GRBsetcallbackfunc(model, backgroundHyperplanes, NULL), "add random hyperplane callback");
+    TRY_MODEL(state = GRBoptimize(model), "optimize");
+    //printf("nrels = %d, nfeas = %d\n", nrels, nfeas);
+    //stopHyperplanes();
+    //printf("Done with first optimization\n");
+
+    /*if(switch_time != -1) {
+    // if the solver was terminated by the callback, it will have set switch_time, so this will run
+    // change the heuristics parameter when this happens
+      TRY_MODEL(state = GRBsetdblparam(GRBgetenv(model), "Heuristics", 1), "change heuristics");
+      TRY_MODEL(state = GRBsetdblparam(GRBgetenv(model), "TimeLimit", tm_lim/1000. - switch_time), "change time limit");
+      TRY_MODEL(state = GRBoptimize(model), "optimize");
+      }*/
+      
+
+    //old code for modified branching strategy (didn't work and not necessary - gurobi does not like being interrupted constantly)
+    /*do {
       if(modified) {
-	//choose branching var
-	/*int candidate = gurobi_random_bounded(branched, dimension + 1, dimension + samples_total(samples));
-	GRBsetintattrelement(model, GRB_INT_ATTR_BRANCHPRIORITY, candidate, 1);
-	branched[candidate] = 1;
-	printf("Candidate = %d\n", candidate);*/
 	double *sol = CALLOC(nvars, double);
 	TRY_MODEL(state = GRBgetdblattrarray(model, "X", 0, nvars, sol), "get intermediate X");
 	int num_cands = 50;
@@ -521,7 +249,7 @@ double *single_gurobi_run(unsigned int *seed,
       TRY_MODEL(state = GRBoptimize(model), "optimize");
       TRY_MODEL(state = GRBgetintattr(model, GRB_INT_ATTR_STATUS, &optimstatus), "get optimization status");
       if(optimstatus == GRB_OPTIMAL) break;
-    } while(modified);
+      } while(modified);*/
 
     //find optimal value of decision vars
     printf("%d variables\n", nvars);
@@ -540,7 +268,8 @@ double *single_gurobi_run(unsigned int *seed,
 
     GRBwrite(model, "soln.sol");
 
-    //printf("--------------------------%d calls--------------------------\n", ncalls);
+    GRBfreeenv(GRBgetenv(model));
+    GRBfreemodel(model);
 
     return result;
 	      

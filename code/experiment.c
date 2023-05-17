@@ -233,8 +233,22 @@ void feature_scaling(env_t *env) {
       for(int i = 0; i < cnt; i++)
 	env->samples->samples[c][i][d] /= norms[d];
     }
-  }  
+  }
 }
+
+void write_samples(samples_t *samples, char *path) {
+  FILE *f = fopen(path, "w");
+  fprintf(f, "%lu %lu %lu\n", samples->dimension, samples->count[0], samples->count[1]);
+  for(size_t class = 0; class < samples->class_cnt; class++) {
+    for(size_t i = 0; i < samples->count[class]; i++) {
+      for(int j = 0; j < samples->dimension; j++) {
+	fprintf(f, "%g ", samples->samples[class][i][j]);
+      }
+      fprintf(f, "\n");
+    }
+  }
+}
+
 
 typedef struct exp_res_t {
   double reach;
@@ -260,14 +274,14 @@ exp_res_t experiment(int param_setting) {
     //env.params->theta = 0.99;
     env.params->branch_target = 0.0;
     env.params->iheur_method = deep;
-    int n = 400;
+    int n = 4000;
     // env.params->lambda = 100 * (n + 1); 
     env.params->rnd_trials = 10000;
     // env.params->rnd_trials_cont = 10;
     env.params->rnd_trials_cont = 0;
     
     //size_t dimension = param_setting;
-    size_t dimension = 2;
+    size_t dimension = 32;
     
     clusters_info_t clusters[2];
     // int n = pow10quick(dimension);
@@ -363,6 +377,7 @@ exp_res_t experiment(int param_setting) {
 	  //fopen("../../data/crops/small-sample.dat", "r");
 	samples = read_binary_samples(infile);
 	fclose(infile);
+	//write_samples(samples, "diffuse4000.dat");
 	
         env.samples = samples;
         n = samples_total(samples);
@@ -384,50 +399,19 @@ exp_res_t experiment(int param_setting) {
             // precision_threshold(seed, &env); See branch theta-search
             // precision_scan(seed, &env);
             // glp_printf("Theta: %g\n", env.params->theta);
-	    /*h = gurobi_relax(seed, 120000, 1200, &env)+1;
-	    printf("Relaxation Hyperplane: ");
-	    for(int i = 0; i <= dimension; i++)
-	      printf("%0.3f%s", h[i], (i == dimension) ? "\n" : " ");
-	      exit(0);*/
-            /*h = single_gurobi_run(seed, 120000, 1200, &env, NULL, &param_setting);
-	    //h = single_run(seed, 120000, &env);
-	    printf("Hyperplane: ");
-	    for(int i = 1; i <= dimension + 1; i++)
-	      printf("%0.3f%s", h[i], (i == dimension + 1) ? "\n" : " ");
-	    printf("Objective value: %0.3f\n", h[0]);
-            hyperplane_to_solution_parts(h + 1, 
-                                         init_solution(solution_size, solution), 
-                                         env.params, 
-                                         samples_validation);
-	    reaches[k] = reach(solution, samples_validation);
-	    precisions[k] = precision(solution, samples_validation);
-
-	    printf("Validation: %u\t%lg\n", 
-		   reaches[k],
-		   precisions[k]);*/
-
 	    
 	    //Training results testing:
-
 	    if(param_setting <= 1) {
-	      gurobi_param p = {param_setting, 0, 0, GRB_INFINITY, 3};
-	      //h = single_gurobi_run(seed, 120000, 1200, &env, NULL, &param_setting);
-	      h = single_gurobi_run(seed, 120000, 1200, &env, NULL, &p);
-	      //h = gurobi_relax(seed, 120000, 1200, &env);
-	      for(int i = env.samples->dimension+2; i <= env.samples->dimension + samples_total(env.samples) + 2; i++) {
-		if(h[i] != 0 && h[i] != 1)
-		  printf("h[%d] = %0.3f\n", i, h[i]);
-	      }
+	      //use gurobi
+	      gurobi_param p = {param_setting, 0, 0, GRB_INFINITY, -1, 0.05, -1};
+	      h = single_gurobi_run(seed, 120000, 1200, &env, &p);
 	      printf("Objective = %0.3f\n", h[0]);
 	    } else if (param_setting == 2) {
+	      //use glpk
 	      h = single_run(seed, 120000, &env);
-	      for(int i = env.samples->dimension+2; i <= env.samples->dimension + samples_total(env.samples) + 2; i++) {
-		if(h[i] != 0 && h[i] != 1) {
-		  printf("h[%d] = %0.3f\n", i, h[i]);
-		}
-	      }
 	      printf("Objective = %0.3f\n", h[0]);
 	    } else {
+	      //best random hyperplane
 	      srand48(*seed);
 	      h = best_random_hyperplane(1, &env);
 	      double *random_solution = blank_solution(samples);
@@ -437,8 +421,6 @@ exp_res_t experiment(int param_setting) {
 	      for(int i = 0; i <= dimension; i++)
 		printf("%0.5f%s", h[i], (i == dimension) ? "\n" : " ");
 	      free(random_solution);
-	      //exit(0);
-	      continue;
 	    }
 
 	    printf("Hyperplane: ");
@@ -456,26 +438,17 @@ exp_res_t experiment(int param_setting) {
 		   precisions[k]);
 
 	    exit(0);
-
 	    
 	    k++;
             free(h);
-	    printf("Freed h\n");
 	}
         free(delete_samples(samples));
-	printf("Freed samples, s=%d\n", s);
     }
-    printf("About to free solution\n");
     free(solution);
-    printf("Freed solution\n");
     free(delete_samples(samples_validation));
-    printf("Freed validation\n");
     delete_clusters_info(clusters);
-    printf("Deleted clusters\n");
     delete_clusters_info(clusters + 1);
-    printf("Deleted clusters + 1\n");
     free(env.params);
-    printf("Freed params\n");
 
     printf("Reaches: ");
     for(int i = 0; i < ntests; i++)
