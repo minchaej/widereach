@@ -35,17 +35,20 @@ int add_gurobi_hyperplane(GRBmodel *model, size_t dimension) {
   double *lb = CALLOC(hyperplane_cnt, double);
   char **varnames = CALLOC(hyperplane_cnt, char *);
   char *name;
-	
+  double *ub = CALLOC(hyperplane_cnt, double);
   for (int i = 0; i < hyperplane_cnt; i++) {
     lb[i] = -GRB_INFINITY;
+    ub[i] = GRB_INFINITY;
     name = varnames[i] = CALLOC(NAME_LEN_MAX, char);
     snprintf(name, NAME_LEN_MAX, "w%u", i + 1);
   }
   snprintf(varnames[dimension_int], NAME_LEN_MAX, "c");
   
+  /*lb[hyperplane_cnt-1]=0;
+    ub[hyperplane_cnt-1]=0;*/
   return GRBaddvars(model, hyperplane_cnt, 
                           0, NULL, NULL, NULL, 
-                          NULL, lb, NULL, 
+                          NULL, lb, ub, 
                           NULL, 
                           varnames);
 }

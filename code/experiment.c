@@ -269,8 +269,8 @@ exp_res_t experiment(int param_setting) {
      * south german credit  .9 (2, 1) (originally said 0.95 here)
      * crop mapping  .99 (76, 0.974359); 
      * */
-    env.params->theta = 0.9;
-    double lambda_factor = 10;
+    env.params->theta = 0.99;
+    double lambda_factor = 100;
     //env.params->theta = 0.99;
     env.params->branch_target = 0.0;
     env.params->iheur_method = deep;
@@ -300,17 +300,19 @@ exp_res_t experiment(int param_setting) {
     info->count[0] = info->count[1] = n / 10;
     
     double side = sqrt(fact(dimension) / fact(FACT_MAX - 1));
+    size_t cluster_sizes[] = {n/40, n/80, n/80, n/20};
     simplex_info_t simplex_info = {
       .count = n,
       .positives = n / 5,
-      .cluster_cnt = 1,
+      .cluster_cnt = 4,
       .dimension = dimension,
-      .side = side
+      .side = side,
+      .cluster_sizes = cluster_sizes
     };
     
     srand48(validation_seed);
     samples_t *samples_validation;
-    //samples_validation = random_samples(n, n / 2, dimension);
+    samples_validation = random_samples(n, n / 2, dimension);
     //samples_validation = random_sample_clusters(clusters);
     //samples_validation = random_simplex_samples(&simplex_info);
     FILE *infile;
@@ -326,7 +328,7 @@ exp_res_t experiment(int param_setting) {
       //fopen("../../data/crops/cross/small-sample-2-validation.dat", "r");
       //fopen("../../data/finance_data/finance-valid.dat", "r");
        // fopen("./sample.dat", "r");
-       samples_validation = read_binary_samples(infile);
+       //samples_validation = read_binary_samples(infile);
        fclose(infile);
     /* glp_printf("Validation\n");
     print_samples(samples_validation);
@@ -351,7 +353,7 @@ exp_res_t experiment(int param_setting) {
         printf("Sample seed: %lu\n", samples_seeds[s]);
     
         samples_t *samples;
-        
+
         //samples = random_samples(n, n / 2, dimension);
         //samples = random_sample_clusters(clusters);
 	//samples = random_simplex_samples(&simplex_info);
@@ -370,14 +372,15 @@ exp_res_t experiment(int param_setting) {
 	  //fopen("../../data/finance_data/finance-train.dat", "r");
 	    // fopen("./small-sample.dat", "r");
 	  //full data sets:
-	  //fopen("../../data/breast-cancer/wdbc.dat", "r");
+	  fopen("../../data/breast-cancer/wdbc.dat", "r");
 	  //fopen("../../data/wine-quality/red-cross/winequality-red.dat", "r");
 	  //fopen("../../data/wine-quality/white-cross/winequality-white-1.dat", "r");
-	  fopen("../../data/south-german-credit/SouthGermanCredit.dat", "r");
+	  //fopen("../../data/south-german-credit/SouthGermanCredit.dat", "r");
 	  //fopen("../../data/crops/small-sample.dat", "r");
 	samples = read_binary_samples(infile);
 	fclose(infile);
-	//write_samples(samples, "diffuse4000.dat");
+	//write_samples(samples, "2cluster4000.dat");
+	//exit(0);
 	
         env.samples = samples;
         n = samples_total(samples);
@@ -399,12 +402,33 @@ exp_res_t experiment(int param_setting) {
             // precision_threshold(seed, &env); See branch theta-search
             // precision_scan(seed, &env);
             // glp_printf("Theta: %g\n", env.params->theta);
+
+	    /*h = gurobi_relax(seed, 120000, 1200, &env);
+	    double *soln = blank_solution(samples);
+	    double obj = hyperplane_to_solution(h, soln, &env);
+	    printf("Reach = %d\n", reach(soln, env.samples));
+	    printf("Precision = %g\n", precision(soln, env.samples));
+	    int npos = 0, nneg = 0;
+	    for(int i = 0; i < n; i++)
+	      if(soln[i] == 1) npos++;
+	      else if(soln[i] == 0) nneg++;
+	      printf("%d pos, %d neg\n", npos, nneg);
+	    exit(0);*/
+	    
+	    //h = single_siman_run(seed, 0, &env, NULL);
+	    /*for(int i = 0; i <= 2; i++) {
+	      double *insep = compute_inseparabilities(&env, i);
+	      printf("i = %d => viol = %g\n", i, *insep);
+	      free(insep);
+	    }
+	    exit(0);*/
 	    
 	    //Training results testing:
 	    if(param_setting <= 1) {
 	      //use gurobi
-	      gurobi_param p = {param_setting, 0, 0, GRB_INFINITY, -1, 0.05, -1};
+	      gurobi_param p = {param_setting, 0, 0, GRB_INFINITY, -1, 0.1, -1};
 	      h = single_gurobi_run(seed, 120000, 1200, &env, &p);
+	      //h = single_siman_run(seed, 0, &env, h+1);
 	      printf("Objective = %0.3f\n", h[0]);
 	    } else if (param_setting == 2) {
 	      //use glpk

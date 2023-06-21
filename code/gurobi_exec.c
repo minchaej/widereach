@@ -132,7 +132,7 @@ double *single_gurobi_run(unsigned int *seed,
     TRY_MODEL(state = GRBsetstrparam(GRBgetenv(model), "LogFile", "gurobi_log.log"), "set log file");
 
     TRY_MODEL(state = GRBupdatemodel(model), "update model");
-    
+
     int nvars;
     TRY_MODEL(state = GRBgetintattr(model, GRB_INT_ATTR_NUMVARS, &nvars), "get number of variables");
     
@@ -194,7 +194,7 @@ double *single_gurobi_run(unsigned int *seed,
     free(h);
     free(random_solution);
 
-    TRY_MODEL(state = GRBsetcallbackfunc(model, gurobi_callback, env), "set callback");
+    //TRY_MODEL(state = GRBsetcallbackfunc(model, gurobi_callback, env), "set callback");
     
     if(param_setting) {
       TRY_MODEL(state = GRBsetintparam(GRBgetenv(model), "Threads", param_setting->threads), "set thread limit");
@@ -218,7 +218,7 @@ double *single_gurobi_run(unsigned int *seed,
 
     //TRY_MODEL(state = GRBsetintparam(GRBgetenv(model), "Threads", 16), "set thread limit");
     //startHyperplanes(env, model);
-    //TRY_MODEL(state = GRBsetcallbackfunc(model, backgroundHyperplanes, NULL), "add random hyperplane callback");
+    //TRY_MODEL(state = GRBsetcallbackfunc(model, backgroundHyperplanes, env), "add random hyperplane callback");
     TRY_MODEL(state = GRBoptimize(model), "optimize");
     //printf("nrels = %d, nfeas = %d\n", nrels, nfeas);
     //stopHyperplanes();
@@ -272,7 +272,7 @@ double *single_gurobi_run(unsigned int *seed,
     GRBfreemodel(model);
 
     return result;
-	      
+    
 
     /*
     // glp_scale_prob(p, GLP_SF_AUTO);

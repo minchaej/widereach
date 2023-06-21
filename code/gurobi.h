@@ -59,3 +59,18 @@ void stopHyperplanes();
 void feature_scaling(env_t *);
 
 int gurobi_callback(GRBmodel *, void *, int, void *);
+
+#include <gsl/gsl_matrix.h>
+
+/** Representation of system 7 from the paper */
+typedef struct sys7_t {
+  gsl_matrix *A;
+  gsl_vector *b;
+  int *ref; //ref[i] is the index in env->samples corresponding to row i in matrix A
+} sys7_t;
+
+double *random_constrained_hyperplane(env_t *env, double *rel_sol, sys7_t *s);
+
+sys7_t *generate_fixedpt_mat(env_t *env, double *rel_sol);
+
+void *compute_inseparabilities(env_t *, int);

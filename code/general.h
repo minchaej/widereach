@@ -272,6 +272,8 @@ typedef struct {
   size_t dimension;
   /** Simplex side length */
   double side;
+  /** Number of points in each simplex, or NULL for half of the positives to be divided evenly among the clusters. */
+  size_t *cluster_sizes;
 } simplex_info_t;
 
 /** Generates random binary samples in the simplex in the given dimension.
@@ -738,3 +740,6 @@ double precision_scan(
   /** Seed, as in single run */
   unsigned int *seed, 
   env_t *);
+
+/** Solve by simulated annealing */
+double *single_siman_run(unsigned int *seed, int iter_lim, env_t *env, double *h0);

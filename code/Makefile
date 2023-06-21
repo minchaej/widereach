@@ -9,7 +9,7 @@ else
 endif
 
 INC = $(GUROBI_HOME)/include/
-LIBS = -L$(GUROBI_HOME)/lib -lgurobi95 -lglpk -lm
+LIBS = -L$(GUROBI_HOME)/lib -lgurobi95 -lglpk -lm -lgsl -lgslcblas
 #LIBS = -L$(GUROBI_HOME)/lib -lgurobi100 -lglpk -lm
 BASE = widereach.h helper.h general.h glpk.h Makefile
 OBJ = samples.o sparse_vector.o env.o indexing.o glpk.o params.o callback.o \
@@ -17,7 +17,7 @@ OBJ = samples.o sparse_vector.o env.o indexing.o glpk.o params.o callback.o \
       traversal.o signature.o children.o paths.o random.o hyperplane.o \
       obstruction.o interdiction.o cuts.o icutgen.o readsamples.o clusters.o \
       exec.o simplex.o \
-      gurobi_exec.o gurobi.o bg_callback.o gurobi_callback.o
+      gurobi_exec.o gurobi.o bg_callback.o gurobi_callback.o constrained_hyperplane.o simulated_annealing.o sep_test.o
 UOBJ = utest.o
 
 .PHONY: all coverage clean dependencies valgrind cleancoverage
