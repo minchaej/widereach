@@ -8,7 +8,7 @@
 unsigned long int samples_seeds[SAMPLE_SEEDS] = {
     85287339, // 412
     20200621154912, // 378
-    20200623170005 // 433
+    // 20200623170005 // 433
     };
 
 /*#define SAMPLE_SEEDS 30
@@ -24,12 +24,12 @@ unsigned long int samples_seeds[SAMPLE_SEEDS] = {
 unsigned int mip_seeds[MIP_SEEDS] = {
     734517477, 145943044, 869199209, 499223379, 523437323, 964156444,
     248689460, 115706114, 711104006, 311906069, 205328448, 471055100,
-    307531192, 543901355, 24851720, 704008414, 2921762, 181094221,
-    234474543, 782516264, 519948660, 115033019, 205486123, 657145193,
-    83898336, 41744843, 153111583, 318522606, 952537249, 298531860
+    307531192, 543901355, // 24851720, 704008414, 2921762, 181094221,
+    // 234474543, 782516264, 519948660, 115033019, 205486123, 657145193,
+    // 83898336, 41744843, 153111583, 318522606, 952537249, 298531860
 };
 
-unsigned long int validation_seed = 593587157;
+unsigned long int validation_seed = 711104006;
 
 // Compute 10^d, where d is even or d=1, 3
 int pow10quick(int d) {
@@ -269,8 +269,8 @@ exp_res_t experiment(int param_setting) {
      * south german credit  .9 (2, 1) (originally said 0.95 here)
      * crop mapping  .99 (76, 0.974359); 
      * */
-    env.params->theta = 0.99;
-    double lambda_factor = 100;
+    env.params->theta = 0.9;
+    double lambda_factor = 1;
     //env.params->theta = 0.99;
     env.params->branch_target = 0.0;
     env.params->iheur_method = deep;
@@ -316,10 +316,10 @@ exp_res_t experiment(int param_setting) {
     //samples_validation = random_sample_clusters(clusters);
     //samples_validation = random_simplex_samples(&simplex_info);
     FILE *infile;
-    infile =
+    // infile =
       //fopen("../../data/breast-cancer/wdbc-validation.dat", "r");
       //fopen("../../data/wine-quality/winequality-red-validation.dat", "r");
-      fopen("../../data/wine-quality/red-cross/winequality-red-2-validation.dat", "r");
+      // fopen("../../data/wine-quality/red-cross/winequality-red-2-validation.dat", "r");
       //fopen("../../data/wine-quality/winequality-white-validation.dat", "r");
       //fopen("../../data/wine-quality/white-cross/winequality-white-2-validation.dat", "r");
       //fopen("../../data/south-german-credit/SouthGermanCredit-validation.dat", "r");
@@ -329,7 +329,7 @@ exp_res_t experiment(int param_setting) {
       //fopen("../../data/finance_data/finance-valid.dat", "r");
        // fopen("./sample.dat", "r");
        //samples_validation = read_binary_samples(infile);
-       fclose(infile);
+      //  fclose(infile);
     /* glp_printf("Validation\n");
     print_samples(samples_validation);
     return 0; */
@@ -355,15 +355,15 @@ exp_res_t experiment(int param_setting) {
         samples_t *samples;
 
         //samples = random_samples(n, n / 2, dimension);
-        //samples = random_sample_clusters(clusters);
+        // samples = random_sample_clusters(clusters);
 	//samples = random_simplex_samples(&simplex_info);
         infile =
 	  //fopen("../../data/breast-cancer/wdbc-training.dat", "r");
-	  //fopen("../../data/wine-quality/winequality-red-training.dat", "r");
+	  // fopen("../../data/wine-quality/winequality-red-training.dat", "r");
 	  //fopen("../../data/wine-quality/red-cross/winequality-red-2-training.dat", "r");
-	  //fopen("../../data/wine-quality/winequality-white-training.dat", "r"); 
-          //fopen("../../data/wine-quality/white-cross/winequality-white-2-training.dat", "r");
-          //fopen("../../data/south-german-credit/SouthGermanCredit-training.dat", "r");
+	  // fopen("../../data/wine-quality/winequality-white-training.dat", "r"); 
+          // fopen("../../data/wine-quality/white-cross/winequality-white-2-training.dat", "r");
+          // fopen("../../data/south-german-credit/SouthGermanCredit-training.dat", "r");
 	  //fopen("../../data/south-german-credit/cross/SouthGermanCredit-2-training.dat", "r");
             // fopen("../../data/cross-sell/train-nocat.dat", "r"); 
             // fopen("../../data/crops/sample.dat", "r");
@@ -372,10 +372,13 @@ exp_res_t experiment(int param_setting) {
 	  //fopen("../../data/finance_data/finance-train.dat", "r");
 	    // fopen("./small-sample.dat", "r");
 	  //full data sets:
-	  fopen("../../data/breast-cancer/wdbc.dat", "r");
-	  //fopen("../../data/wine-quality/red-cross/winequality-red.dat", "r");
-	  //fopen("../../data/wine-quality/white-cross/winequality-white-1.dat", "r");
-	  //fopen("../../data/south-german-credit/SouthGermanCredit.dat", "r");
+	  // fopen("../../data/breast-cancer/wdbc.dat", "r");
+	  // fopen("../../data/breast-cancer/wdbc-training.dat", "r");
+	  // fopen("../../data/testing.dat", "r");
+	  // fopen("../../data/testing_rev.dat", "r");
+	  // fopen("../../data/wine-quality/red-cross/winequality-red.dat", "r");
+	  // fopen("../../data/wine-quality/white-cross/winequality-white-1.dat", "r");
+	  fopen("../../data/south-german-credit/SouthGermanCredit.dat", "r");
 	  //fopen("../../data/crops/small-sample.dat", "r");
 	samples = read_binary_samples(infile);
 	fclose(infile);
@@ -427,8 +430,12 @@ exp_res_t experiment(int param_setting) {
 	    if(param_setting <= 1) {
 	      //use gurobi
 	      gurobi_param p = {param_setting, 0, 0, GRB_INFINITY, -1, 0.1, -1};
-	      h = single_gurobi_run(seed, 120000, 1200, &env, &p);
-	      //h = single_siman_run(seed, 0, &env, h+1);
+	      // h = single_gurobi_run(seed, 120000, 1200, &env, &p);
+	      // h = single_siman_run(seed, 0, &env, h+1);
+	      // h = single_run(seed, 120000, &env);
+
+        h = single_siman_run(seed, 0, &env, NULL); // todo mine
+
 	      printf("Objective = %0.3f\n", h[0]);
 	    } else if (param_setting == 2) {
 	      //use glpk
@@ -451,6 +458,7 @@ exp_res_t experiment(int param_setting) {
 	    for(int i = 1; i <= env.samples->dimension + 1; i++)
 	      printf("%0.5f%s", h[i], (i == env.samples->dimension + 1) ? "\n" : " ");
 	    //printf("Objective value: %0.3f\n", h[0]);
+        printf("The number is: %d\n", k);
 
 	    reaches[k] = reach(h, env.samples);
 	    precisions[k] = precision(h, env.samples);
@@ -461,7 +469,7 @@ exp_res_t experiment(int param_setting) {
 		   reaches[k],
 		   precisions[k]);
 
-	    exit(0);
+	    // exit(0);
 	    
 	    k++;
             free(h);

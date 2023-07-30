@@ -38,6 +38,9 @@ itest:	$(OBJ) $(BASE) itest.o
 experiment:	$(OBJ) $(BASE) experiment.o cleancoverage
 	$(CC) $(CFLAGS) -o $@ $(OBJ) experiment.o $(LIBS) -fopenmp
 
+experiment_sa:	$(OBJ) $(BASE) experiment_sa.o cleancoverage
+	$(CC) $(CFLAGS) -o $@ $(OBJ) experiment_sa.o $(LIBS) -fopenmp
+
 hyperrnd:	$(OBJ) $(BASE) hyperrnd.o
 	$(CC) $(CFLAGS) -o $@ $(OBJ) hyperrnd.o $(LIBS) -fopenmp
 	
