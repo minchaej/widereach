@@ -7,24 +7,10 @@
 #include <gsl/gsl_blas.h>
 
 
-// #define N_TRIES 200 /* how many points do we try before stepping */
 #define N_TRIES 800 /* how many points do we try before stepping */
-// #define N_TRIES 3200 /* how many points do we try before stepping */
-
-// #define ITERS_FIXED_T 500 /* how many iterations for each T? */
 #define ITERS_FIXED_T 2000 /* how many iterations for each T? */
-// #define ITERS_FIXED_T 8000 /* how many iterations for each T? */
-
-// #define K 1.0 /* Boltzmann constant */
 #define K 3.0 /* Boltzmann constant */
-// #define K 10.0 /* Boltzmann constant */
-
 #define STEP_SIZE 1.0 /* max step size in random walk */
-// #define STEP_SIZE 10000.0 /* max step size in random walk */
-// #define STEP_SIZE 100000000.0 /* max step size in random walk */
-
-
-
 #define T_INITIAL 1.0 /* initial temperature */
 #define MU_T 1.003 /* damping factor for temperature */
 #define T_MIN 0.1 // NOTE: changed
