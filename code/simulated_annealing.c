@@ -119,7 +119,7 @@ double *single_siman_run_param(unsigned int *seed, int iter_lim, env_t *env_p, d
   gsl_rng *r = gsl_rng_alloc(gsl_rng_taus);
   gsl_rng_set(r, rand());
 
-  gsl_siman_solve(r, h0, energy, siman_step, hplane_dist, NULL, NULL, NULL, NULL, (env->samples->dimension+1)*sizeof(double), p);
+  gsl_siman_solve(r, h0, energy, siman_step, hplane_dist, print_hplane, NULL, NULL, NULL, (env->samples->dimension+1)*sizeof(double), p);
 
   double *random_solution = blank_solution(env->samples);
   double random_objective_value = hyperplane_to_solution(h0, random_solution, env);
