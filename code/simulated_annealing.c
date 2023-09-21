@@ -18,7 +18,10 @@
 gsl_siman_params_t params = {N_TRIES, ITERS_FIXED_T, STEP_SIZE, K, T_INITIAL, MU_T, T_MIN};
 env_t *env; //this probably could be included in the current state xp
 
-// this is the function that is not working
+int N;  // Global variable to store n
+double *moving_avg;  // Moving average array
+double *prev_change;
+
 double energy(void *xp) {
   //returns -1 * obj of hyperplane specified in xp
   //this will be minimized
@@ -31,14 +34,7 @@ double energy(void *xp) {
   return -obj;
 }
 
-// void take_step(const gsl_rng *r, void *xp, double step_size) {
-//     double *hyperplane = (double *)xp;
-
-//     for (int i = 0; i < N; i++) {
-//         hyperplane[i] += gsl_ran_gaussian(r, step_size);
-//     }
-// }
-
+// 1. Original gsl_ran_dir_nd random step function
 void siman_step(const gsl_rng *r, void *xp, double step_size) {
   int n = env->samples->dimension + 1; //add 1 to include c in the space
   double *h = (double *) xp;
@@ -49,6 +45,144 @@ void siman_step(const gsl_rng *r, void *xp, double step_size) {
     h[i] = newhi;
   }
   free(u);
+}
+
+// 2. Step function that uses history average
+void take_step_average(const gsl_rng *r, void *xp, double step_size) {
+    double *hyperplane = (double *)xp;
+    double alpha = 0.9;  // Decay factor for moving average
+
+    for (int i = 0; i < N; i++) {
+        double change = gsl_ran_gaussian(r, step_size);
+        hyperplane[i] += change;
+
+        // Adjust the moving average
+        moving_avg[i] = alpha * moving_avg[i] + (1.0 - alpha) * hyperplane[i];
+    }
+}
+
+// 3. Step function that uses history average with threshold
+void take_step_average_threshold(const gsl_rng *r, void *xp, double step_size) {
+    double *hyperplane = (double *)xp;
+    double alpha = 0.9;  // Decay factor for moving average
+    double threshold = 0.1;
+
+    for (int i = 0; i < N; i++) {
+        double scaled_step_size = step_size * (1.0 + threshold * moving_avg[i]);
+        double change = gsl_ran_gaussian(r, scaled_step_size);
+        hyperplane[i] += change;
+
+        // Adjust the moving average
+        moving_avg[i] = alpha * moving_avg[i] + (1.0 - alpha) * hyperplane[i];
+    }
+}
+
+// 4. Step function that uses history of the momentum
+void take_step_momentum(const gsl_rng *r, void *xp, double step_size) {
+    double *hyperplane = (double *)xp;
+    double momentum_factor = 0.7; // A factor to decide how much of the previous change is used.
+
+    for (int i = 0; i < N; i++) {
+        double change = gsl_ran_gaussian(r, step_size) + momentum_factor * prev_change[i];
+        hyperplane[i] += change;
+        prev_change[i] = change;
+    }
+}
+
+// 5. Step function that uses Gaussian
+void take_step_gaussian(const gsl_rng *r, void *xp, double step_size) {
+    double *hyperplane = (double *)xp;
+
+    for (int i = 0; i < N; i++) {
+        hyperplane[i] += gsl_ran_gaussian(r, step_size);
+    }
+}
+
+//6. Step function that uses uniform Rand
+void take_step_uniform(const gsl_rng *r, void *xp, double step_size) {
+    double *hyperplane = (double *)xp;
+
+    for (int i = 0; i < N; i++) {
+        hyperplane[i] += gsl_rng_uniform(r) * 2 * step_size - step_size;
+    }
+}
+
+//7. Step function that uses angle
+void take_step_angle(const gsl_rng *r, void *xp, double step_size) {
+    double *hyperplane = (double *)xp;
+    double angle = (gsl_rng_uniform(r) * 2 - 1) * step_size; // random angle between -step_size and step_size
+    
+    for (int i = 0; i < N - 1; i++) {
+        hyperplane[i] = hyperplane[i] * cos(angle) - hyperplane[i+1] * sin(angle);
+    }
+    hyperplane[N-1] = hyperplane[N-1] * cos(angle);
+}
+
+//8. Step function that uses periodic
+void take_step_periodic(const gsl_rng *r, void *xp, double step_size) {
+    double *hyperplane = (double *)xp;
+
+    for (int i = 0; i < N; i++) {
+        double change = gsl_ran_gaussian(r, step_size) + step_size * sin(hyperplane[i]);
+        hyperplane[i] += change;
+    }
+}
+
+//9. Step function that considers neighbors
+void take_step_neighbor(const gsl_rng *r, void *xp, double step_size) {
+    double *hyperplane = (double *)xp;
+
+    for (int i = 0; i < N; i++) {
+        double neighbor_influence = (i == 0 ? 0 : hyperplane[i-1] - hyperplane[i]) + (i == N-1 ? 0 : hyperplane[i+1] - hyperplane[i]);
+        double change = gsl_ran_gaussian(r, step_size) + 0.2 * neighbor_influence;
+        hyperplane[i] += change;
+    }
+}
+
+//10. Step function that uses direction change.
+void take_step_directional(const gsl_rng *r, void *xp, double step_size) {
+    double *hyperplane = (double *)xp;
+
+    for (int i = 0; i < N; i++) {
+        double direction = gsl_rng_uniform(r) > 0.5 ? 1.0 : -1.0;
+        hyperplane[i] += direction * step_size;
+    }
+}
+
+//11. Step function that does artificial noise - high focus on exploaraion
+double noise_factor = 0.05; // Magnitude of the noise
+
+void take_step_noise_injection(const gsl_rng *r, void *xp, double step_size) {
+    double *hyperplane = (double *)xp;
+
+    for (int i = 0; i < N; i++) {
+        hyperplane[i] += gsl_ran_gaussian(r, step_size) + gsl_ran_cauchy(r, noise_factor);
+    }
+}
+
+//12.  Step function that uses log
+void take_step_log_perturbation(const gsl_rng *r, void *xp, double step_size) {
+    double *hyperplane = (double *)xp;
+
+    for (int i = 0; i < N; i++) {
+        hyperplane[i] *= exp(gsl_ran_gaussian(r, step_size));
+    }
+}
+
+//13. Step function uses larger jumps
+double jump_probability = 0.005;
+double jump_factor = 10;
+
+void take_step_jump(const gsl_rng *r, void *xp, double step_size) {
+    double *hyperplane = (double *)xp;
+
+    for (int i = 0; i < N; i++) {
+        if (gsl_rng_uniform(r) < jump_probability) {
+            hyperplane[i] += gsl_ran_gaussian(r, step_size * jump_factor);
+        } else {
+            hyperplane[i] += gsl_ran_gaussian(r, step_size);
+        }
+    }
 }
 
 double hplane_dist(void *xp, void *yp) {
@@ -95,6 +229,9 @@ double *single_siman_run(unsigned int *seed, int iter_lim, env_t *env_p, double 
 
 double *single_siman_run_param(unsigned int *seed, int iter_lim, env_t *env_p, double *h0, gsl_siman_params_t p) {
   env = env_p;
+  N = env->samples->dimension + 1;  // Set the value of N
+  moving_avg = calloc(N, sizeof(double));
+  prev_change = calloc(N, sizeof(double));
   srand48(*seed);
   if(!h0) {
     //initialize to all zeros
@@ -105,10 +242,12 @@ double *single_siman_run_param(unsigned int *seed, int iter_lim, env_t *env_p, d
   gsl_rng *r = gsl_rng_alloc(gsl_rng_taus);
   gsl_rng_set(r, rand());
 
-  gsl_siman_solve(r, h0, energy, siman_step, hplane_dist, print_hplane, NULL, NULL, NULL, (env->samples->dimension+1)*sizeof(double), p);
+  gsl_siman_solve(r, h0, energy, take_step_average_threshold, hplane_dist, print_hplane, NULL, NULL, NULL, (env->samples->dimension+1)*sizeof(double), p);
 
   double *random_solution = blank_solution(env->samples);
   double random_objective_value = hyperplane_to_solution(h0, random_solution, env);
   printf("obj = %g\n", random_objective_value);
+  free(moving_avg);
+  free(prev_change);
   return random_solution;
 }
