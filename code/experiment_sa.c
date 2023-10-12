@@ -15,7 +15,7 @@
 
 #define SAMPLE_SEEDS 3
 unsigned long int samples_seeds[SAMPLE_SEEDS] = {
-    20200621154955, // 378
+    // 2020011234955, // 378
     85287339,       // 412
     // 20200623170005 // 433
 };
@@ -23,7 +23,7 @@ unsigned long int samples_seeds[SAMPLE_SEEDS] = {
 // 711104006
 #define MIP_SEEDS 30
 unsigned int mip_seeds[MIP_SEEDS] = {
-    734517477, 145943044, 869199209, 499223379, 523437323, 964156444,
+    964156444, 145943044, 869199209, 499223379, 523437323, 964156444,
     248689460, 115706114, 711104006, 311906069, 205328448, 471055100,
     307531192, 543901355, // 24851720, 704008414, 2921762, 181094221,
                           // 234474543, 782516264, 519948660, 115033019, 205486123, 657145193,
@@ -52,6 +52,35 @@ double fact(unsigned int n)
 int randomIntegerInRange(int min, int max) {
     // Generate a random integer within the range [min, max]
     return (rand() % (max - min + 1)) + min;
+}
+
+void feature_scaling(env_t *env) {
+  size_t dim = env->samples->dimension;
+  int nsamples = 0;
+  for(int c = 0; c < env->samples->class_cnt; c++)
+    nsamples += env->samples->count[c];
+  double *norms = CALLOC(nsamples, double);
+  for(int c = 0; c < env->samples->class_cnt; c++) {
+    size_t cnt = env->samples->count[c];
+    for(int d = 0; d < dim; d++) {
+      //selected class c, feature d
+      for(int i = 0; i < cnt; i++)
+	norms[d] += fabs(env->samples->samples[c][i][d]);
+    }
+  }
+  //now that norms have been computed, we go back and scale each feature
+  for(int c = 0; c < env->samples->class_cnt; c++) {
+    size_t cnt = env->samples->count[c];
+    for(int d = 0; d < dim; d++) {
+      if(norms[d] == 0){
+	printf("Found norm 0 in feature scaling\n");
+	continue;
+      }
+                  
+      for(int i = 0; i < cnt; i++)
+	env->samples->samples[c][i][d] /= norms[d];
+    }
+  }
 }
 
 double randomDoubleInRange(double min, double max) {
@@ -136,11 +165,12 @@ exp_res_t experiment(int param_setting)
   double *precisions = CALLOC(ntests, double);
   int k = 0;
 
+// seeting k 3 and step3 witl yield reach of 217.
   int sa_param_cnt = 3;
   int sa_n_tries[] = {200, 800, 3200};
   int sa_iters_fixed_t[] = {500, 2000, 8000};
-  double sa_k[] = {1.0, 3.0, 10.0};
-  double sa_step_size[] = {1.0, 10000.0, 100000000.0};
+  double sa_k[] = {3.0, 3.0, 10.0};
+  double sa_step_size[] = {3.0, 10000.0, 100000000.0};
 
 
   for (int s = 0; s < SAMPLE_SEEDS; s++)
@@ -157,18 +187,21 @@ exp_res_t experiment(int param_setting)
     fclose(infile);
 
     env.samples = samples;
+    add_bias(samples);
+    feature_scaling(&env);
+    normalize_samples(samples);
+    //print_samples(samples);
     n = samples_total(samples);
     env.params->lambda = lambda_factor * (n + 1);
-    env.params->epsilon_precision = 3. / 990;
+    env.params->epsilon_precision = 3./990;
+    //env.params->epsilon_precision = 3000./990000;
 
     for (int t = 0; t < MIP_SEEDS; t++)
     {
 
       unsigned int *seed = mip_seeds + t;
-      printf("Start of Experimentation: \n");
 
       // grid search...
-      /*
       for (int i_n_tries = 0; i_n_tries < sa_param_cnt; i_n_tries++)
       {
         for (int i_iters_fixed = 0; i_iters_fixed < sa_param_cnt; i_iters_fixed++)
@@ -181,29 +214,38 @@ exp_res_t experiment(int param_setting)
               printf("n_tries = %d, iters_fixed = %d, step_size = %.2f, k = %.2f, t_initial = %.2f, mu_t = %.2f, t_min = %.2f\n",
                      sa_n_tries[i_n_tries], sa_iters_fixed_t[i_iters_fixed], sa_step_size[i_step_size],
                      sa_k[i_k], T_INITIAL, MU_T, T_MIN);
-              printf("Random Integer: %d\n", randomIntegerInRange(1, 10000));
-              printf("Random Double: %.2f\n", randomDoubleInRange(1.0, 10000.0));
-              h = single_siman_run_param(seed, 0, &env, NULL, params); // todo
+              // printf("Random Integer: %d\n", randomIntegerInRange(1, 10000));
+              // printf("Random Double: %.2f\n", randomDoubleInRange(1.0, 10000.0));
+
+              // 3. Call the genetic_algorithm_run function
+              // double *best_solution = genetic_algorithm_run(seed, &env);
+              double *best_solution = tabu_search_run(seed, &env, NULL);
+              // double *best_solution = pso_run(seed, &env);
+
+              // 4. Handle or use the result
+              printf("Best solution found:\n");
+              // h = single_siman_run_param(seed, 0, &env, NULL, params); // todo
+              exit(0);
+              return;
             }
           }
         }
       }
-      */
 
       // random search...
-      for (int idx = 0; idx < 100; idx++)
-      {
-        int rand_n_tries = randomIntegerInRange(1, 1000);
-        int rand_iters_fiexed_t = randomIntegerInRange(1, 1000);
-        double rand_step_size = randomDoubleInRange(1.0, 10000000.0);
-        double rand_k = randomDoubleInRange(1.0, 10.0);
+      // for (int idx = 0; idx < 100; idx++)
+      // {
+      //   int rand_n_tries = randomIntegerInRange(1, 1000);
+      //   int rand_iters_fiexed_t = randomIntegerInRange(1, 1000);
+      //   double rand_step_size = randomDoubleInRange(1.0, 10000000.0);
+      //   double rand_k = randomDoubleInRange(1.0, 10.0);
 
-        gsl_siman_params_t params = {rand_n_tries, rand_iters_fiexed_t, rand_step_size, rand_k, T_INITIAL, MU_T, T_MIN};
-        h = single_siman_run_param(seed, 0, &env, NULL, params); // todo
-        printf("n_tries = %d, iters_fixed = %d, step_size = %.2f, k = %.2f, t_initial = %.2f, mu_t = %.3f, t_min = %.2f\n",
-               rand_n_tries, rand_iters_fiexed_t, rand_step_size,
-               rand_k, T_INITIAL, MU_T, T_MIN);
-      }
+      //   gsl_siman_params_t params = {rand_n_tries, rand_iters_fiexed_t, rand_step_size, rand_k, T_INITIAL, MU_T, T_MIN};
+      //   h = single_siman_run_param(seed, 0, &env, NULL, params); // todo
+      //   printf("n_tries = %d, iters_fixed = %d, step_size = %.2f, k = %.2f, t_initial = %.2f, mu_t = %.3f, t_min = %.2f\n",
+      //          rand_n_tries, rand_iters_fiexed_t, rand_step_size,
+      //          rand_k, T_INITIAL, MU_T, T_MIN);
+      // }
 
       printf("Objective = %0.3f\n", h[0]);
       printf("Hyperplane: ");

@@ -148,6 +148,42 @@ int side(
     return 0. == dist ? loc->class : dist > 0.;
 }
 
+void normalize_samples(samples_t *samples) {
+  //scales all samples to have unit norm
+  //this is valid if the problem is unbiased
+  size_t d = samples->dimension;
+  for(int class = 0; class < 2; class++) {
+    for(size_t i = 0; i < samples->count[class]; i++) {
+      double *s = samples->samples[class][i];
+      double norm = 0;
+      for(int j = 0; j < d; j++)
+	norm += s[j]*s[j];
+      norm = sqrt(norm);
+      for(int j = 0; j < d; j++)
+	s[j] /= norm;
+    }
+  }
+}
+
+void add_bias(samples_t *samples) {
+  for(int class = 0; class < 2; class++) {
+    for(size_t i = 0; i < samples->count[class]; i++) {
+      double *s = samples->samples[class][i];
+      //double *new_s = realloc(s, samples->dimension+1);
+      double *new_s = CALLOC(samples->dimension+1, double);
+      memcpy(new_s, s, sizeof(double)*samples->dimension);
+      if(!new_s) {
+	printf("add_bias: realloc failed\n");
+	exit(EXIT_FAILURE);
+      }
+      s = new_s;
+      s[samples->dimension] = 1;
+      samples->samples[class][i] = s;
+    }
+  }
+  samples->dimension++;
+}
+
 int side_cnt(
 		int class, 
 		samples_t *samples, 

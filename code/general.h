@@ -623,6 +623,13 @@ double hyperplane_to_solution_parts(
 /** @return reach of the given integer solution for the given samples */
 unsigned int reach(double *solution, samples_t *);
 
+/** Add an extra feature to each sample which is always equal to 1 */
+void add_bias(samples_t *);
+
+/** Scale all samples to have unit norm.
+    This yields an equivalent problem if the problem is unbiased */
+void normalize_samples(samples_t *);
+
 /** @return number of false positives in the given integer solution 
  *for the given samples */
 unsigned int false_positives(double *solution, samples_t *);

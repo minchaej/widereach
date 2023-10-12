@@ -208,33 +208,58 @@ int main_glpk() {
 }
 
 void feature_scaling(env_t *env) {
-  size_t dim = env->samples->dimension;
-  int nsamples = 0;
-  for(int c = 0; c < env->samples->class_cnt; c++)
-    nsamples += env->samples->count[c];
-  double *norms = CALLOC(nsamples, double);
-  for(int c = 0; c < env->samples->class_cnt; c++) {
-    size_t cnt = env->samples->count[c];
-    for(int d = 0; d < dim; d++) {
-      //selected class c, feature d
-      for(int i = 0; i < cnt; i++)
-	norms[d] += fabs(env->samples->samples[c][i][d]);
+    size_t dim = env->samples->dimension;
+    int nsamples = 0;
+    
+    for (int c = 0; c < env->samples->class_cnt; c++) {
+        nsamples += env->samples->count[c];
     }
-  }
-  //now that norms have been computed, we go back and scale each feature
-  for(int c = 0; c < env->samples->class_cnt; c++) {
-    size_t cnt = env->samples->count[c];
-    for(int d = 0; d < dim; d++) {
-      if(norms[d] == 0){
-	printf("Found norm 0 in feature scaling\n");
-	continue;
-      }
-                  
-      for(int i = 0; i < cnt; i++)
-	env->samples->samples[c][i][d] /= norms[d];
+    
+    double *norms = CALLOC(nsamples, double);
+    
+    for (int c = 0; c < env->samples->class_cnt; c++) {
+        size_t cnt = env->samples->count[c];
+        
+        for (int d = 0; d < dim; d++) {
+            // selected class c, feature d
+            for (int i = 0; i < cnt; i++) {
+                norms[d] += fabs(env->samples->samples[c][i][d]);
+            }
+        }
     }
-  }
+    
+    // Now that norms have been computed, we go back and scale each feature
+    for (int c = 0; c < env->samples->class_cnt; c++) {
+        size_t cnt = env->samples->count[c];
+        
+        for (int d = 0; d < dim; d++) {
+            if (norms[d] == 0) {
+                printf("Found norm 0 in feature scaling\n");
+                continue;
+            }
+            
+            for (int i = 0; i < cnt; i++) {
+                env->samples->samples[c][i][d] /= norms[d];
+            }
+        }
+        
+        // Normalize each sample vector to make it a unit vector
+        for (int i = 0; i < cnt; i++) {
+            double magnitude = 0.0;
+            for (int d = 0; d < dim; d++) {
+                magnitude += pow(env->samples->samples[c][i][d], 2);
+            }
+            magnitude = sqrt(magnitude);
+            
+            if (magnitude > 0.0) {
+                for (int d = 0; d < dim; d++) {
+                    env->samples->samples[c][i][d] /= magnitude;
+                }
+            }
+        }
+    }
 }
+
 
 void write_samples(samples_t *samples, char *path) {
   FILE *f = fopen(path, "w");
@@ -394,8 +419,9 @@ exp_res_t experiment(int param_setting) {
         //print_samples(env.samples);
         //return (exp_res_t) {0, 0};
 	
-	//feature_scaling(&env);
-        
+    add_bias(samples);
+    feature_scaling(&env);
+    normalize_samples(samples);        
         for (int t = 0; t < MIP_SEEDS; t++) {
 	//for (int t = 0; t < 1; t++) {
         // if (0) { int t=0;
@@ -429,14 +455,15 @@ exp_res_t experiment(int param_setting) {
 	    //Training results testing:
 	    if(param_setting <= 1) {
 	      //use gurobi
-	      gurobi_param p = {param_setting, 0, 0, GRB_INFINITY, -1, 0.1, -1};
-	      // h = single_gurobi_run(seed, 120000, 1200, &env, &p);
+	      gurobi_param p = {param_setting, 0, 0, GRB_INFINITY, -1, 0.15, -1};
+	      h = single_gurobi_run(seed, 120000, 1200, &env, &p);
 	      // h = single_siman_run(seed, 0, &env, h+1);
 	      // h = single_run(seed, 120000, &env);
 
-        h = single_siman_run(seed, 0, &env, NULL); // todo mine
+        // h = single_siman_run(seed, 0, &env, NULL); // todo mine
 
 	      printf("Objective = %0.3f\n", h[0]);
+        exit(0);
 	    } else if (param_setting == 2) {
 	      //use glpk
 	      h = single_run(seed, 120000, &env);
