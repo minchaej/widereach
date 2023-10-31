@@ -755,3 +755,5 @@ double *single_siman_run(unsigned int *seed, int iter_lim, env_t *env, double *h
 
 /** Solve by simulated annealing */
 double *single_siman_run_param(unsigned int *seed, int iter_lim, env_t *env, double *h0, gsl_siman_params_t p);
+
+double *best_random_hyperplane_unbiased(int, env_t *);

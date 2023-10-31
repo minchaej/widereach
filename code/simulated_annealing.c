@@ -25,19 +25,6 @@ int N;  // Global variable to store n
 double *moving_avg;  // Moving average array
 double *prev_change;
 
-double energy(void *xp) {
-  //returns -1 * obj of hyperplane specified in xp
-  //this will be minimized
-  double *h = xp;
-      // printf("%f %f %f\n", h[0], h[1], h[2]);
-  // printf("h = %f\n", *h);
-//   double obj = hyperplane_to_solution(h, NULL, env);
-  double obj = obj_new(h, env);
-// printf("obj = %f\n", obj);
-  // printf("h = %f, obj = %f\n", *h, obj);
-  return -obj;
-}
-
 // WIP: Must validate correctness
 double obj_new(double *h, env_t *env) {
   size_t reach = 0, nfpos = 0;
@@ -76,18 +63,81 @@ double obj_new(double *h, env_t *env) {
   return reach - violation * env->params->lambda;
 }
 
-// 1. Original gsl_ran_dir_nd random step function
+double energy(void *xp) {
+  //returns -1 * obj of hyperplane specified in xp
+  //this will be minimized
+  double *h = xp;
+      // printf("%f %f %f\n", h[0], h[1], h[2]);
+  // printf("h = %f\n", *h);
+//   double obj = hyperplane_to_solution(h, NULL, env);
+  double obj = obj_new(h, env);
+// printf("obj = %f\n", obj);
+  // printf("h = %f, obj = %f\n", *h, obj);
+  return -obj;
+}
+
+double* orthogonal_to(const double *a, const double *b, int n) {
+  double *result = CALLOC(n, double);
+  
+  // Calculate dot products
+  double dot_a_b = 0.0;
+  double dot_a_a = 0.0;
+  for (int i = 0; i < n; i++) {
+    dot_a_b += a[i] * b[i];
+    dot_a_a += a[i] * a[i];
+  }
+
+  for (int i = 0; i < n; i++) {
+    result[i] = b[i] - (dot_a_b / dot_a_a) * a[i];
+  }
+
+  // Normalizing the result (to make sure it's a unit vector)
+  double norm = 0.0;
+  for (int i = 0; i < n; i++) {
+    norm += result[i] * result[i];
+  }
+  norm = sqrt(norm);
+  
+  for (int i = 0; i < n; i++) {
+    result[i] /= norm;
+  }
+  
+  return result;
+}
+
+
 void siman_step(const gsl_rng *r, void *xp, double step_size) {
   int n = env->samples->dimension;
   double *h = (double *) xp;
+  
+  // Get a random unit vector u
   double *u = CALLOC(n, double);
-  gsl_ran_dir_nd(r, n, u); //random unit vector
-  for(int i = 0; i < n; i++) {
-    double newhi = h[i] + step_size * u[i];
-    h[i] = newhi;
+  gsl_ran_dir_nd(r, n, u); // random unit vector
+
+  // Get a vector w that's orthogonal to both h and u
+  double *w = orthogonal_to(h, u, n);
+
+  for (int i = 0; i < n; i++)
+  {
+      double newhi = h[i] + step_size * w[i];
+      h[i] = newhi;
   }
+
+  double norm = 0.0;
+  for (int i = 0; i < n; i++)
+  {
+      norm += h[i] * h[i];
+  }
+  norm = sqrt(norm);
+  for (int i = 0; i < n; i++)
+  {
+      h[i] /= norm;
+  }
+
   free(u);
+  free(w);
 }
+
 
 // 2. Step function that uses history average
 void take_step_average(const gsl_rng *r, void *xp, double step_size) {
@@ -240,20 +290,28 @@ double hplane_dist_spatial(void *xp, void *yp) {
 
 
 double hplane_dist(void *xp, void *yp) {
-  double *h1 = xp, *h2 = yp;
-  int n = env->samples->dimension;
+    double *h1 = xp, *h2 = yp;
+    int n = env->samples->dimension;
 
-  gsl_vector x1 = gsl_vector_view_array(h1, n).vector;
-  gsl_vector x2 = gsl_vector_view_array(h2, n).vector;
+    gsl_vector x1 = gsl_vector_view_array(h1, n).vector;
+    gsl_vector x2 = gsl_vector_view_array(h2, n).vector;
 
-  // Calculate the dot product between x1 and x2.
-  double dot_product = 0;
-  gsl_blas_ddot(&x1, &x2, &dot_product);
+    // Normalize the vectors
+    // gsl_vector_scale(&x1, 1.0 / gsl_blas_dnrm2(&x1));
+    // gsl_vector_scale(&x2, 1.0 / gsl_blas_dnrm2(&x2));
 
-  // Calculate the inverse cosine of the dot product.
-  double inverse_cosine = acos(dot_product);
+    // Calculate the dot product between x1 and x2.
+    double dot_product = 0;
+    gsl_blas_ddot(&x1, &x2, &dot_product);
 
-  return inverse_cosine;
+    // Clamp dot_product to [-1, 1] to avoid potential floating point issues.
+    if (dot_product > 1.0) dot_product = 1.0;
+    if (dot_product < -1.0) dot_product = -1.0;
+
+    // Calculate the inverse cosine of the dot product.
+    double angular_distance = acos(dot_product);
+
+    return angular_distance;
 }
 
 void print_hplane(void *xp) {
@@ -273,7 +331,7 @@ double *single_siman_run(unsigned int *seed, int iter_lim, env_t *env_p, double 
     //initialize to all zeros
     //this could be best random hyperplane instead
     //h0 = CALLOC(env->samples->dimension+1, double);
-    h0 = best_random_hyperplane(1, env);
+    h0 = best_random_hyperplane_unbiased(1, env);
   }
   gsl_rng *r = gsl_rng_alloc(gsl_rng_taus);
   gsl_rng_set(r, rand());
@@ -296,12 +354,12 @@ double *single_siman_run_param(unsigned int *seed, int iter_lim, env_t *env_p, d
     //initialize to all zeros
     //this could be best random hyperplane instead
     //h0 = CALLOC(env->samples->dimension+1, double);
-    h0 = best_random_hyperplane(1, env);
+    h0 = best_random_hyperplane_unbiased(1, env);
   }
   gsl_rng *r = gsl_rng_alloc(gsl_rng_taus);
   gsl_rng_set(r, rand());
 
-  gsl_siman_solve(r, h0, energy, take_step_average_threshold, hplane_dist, print_hplane, NULL, NULL, NULL, (env->samples->dimension)*sizeof(double), p);
+  gsl_siman_solve(r, h0, energy, siman_step, hplane_dist, print_hplane, NULL, NULL, NULL, (env->samples->dimension)*sizeof(double), p);
 
   double *random_solution = blank_solution(env->samples);
   double random_objective_value = hyperplane_to_solution(h0, random_solution, env);
@@ -448,7 +506,7 @@ double *tabu_search_run(unsigned int *seed, env_t *env_p, double *h0)
         // initialize to all zeros
         // this could be best random hyperplane instead
         // h0 = CALLOC(env->samples->dimension+1, double);
-        h0 = best_random_hyperplane(1, env);
+        h0 = best_random_hyperplane_unbiased(1, env);
     }
     r = gsl_rng_alloc(gsl_rng_taus);
     gsl_rng_set(r, *seed);
