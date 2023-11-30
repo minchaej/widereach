@@ -320,8 +320,8 @@ void siman_step_cosine(const gsl_rng *r, void *xp, double step_size) {
     }
 
     // Form the new vector h
-    double cos_theta = step_size;
-    double sin_theta = sqrt(1 - cos_theta * cos_theta);
+    double cos_theta = cos(step_size);
+    double sin_theta = sin(step_size);
     for (int i = 0; i < n; ++i) {
         h[i] = cos_theta * u[i] + sin_theta * uperp[i];
     }
@@ -445,17 +445,6 @@ void siman_rotate_step_paper(const gsl_rng *r, void *xp, double step_size) {
     // Clean up
     gsl_vector_free(temp_result);
     gsl_matrix_free(R);
-}
-
-double hplane_dist_spatial(void *xp, void *yp) {
-  double *h1 = xp, *h2 = yp;
-  int n = env->samples->dimension;
-  gsl_vector x1 = gsl_vector_view_array(h1, n).vector;
-  gsl_vector x2 = gsl_vector_view_array(h2, n).vector;
-  gsl_vector_sub(&x1, &x2); //x1 -= x2
-  double dist = gsl_blas_dnrm2(&x1);
-  // printf("h1 = %p, h2 = %p, dist = %f\n", (void *)h1, (void *)h2, dist);
-  return dist;
 }
 
 // 2. Step function that uses history average
