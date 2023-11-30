@@ -1,6 +1,7 @@
 #include "widereach.h"
 #include "helper.h"
 
+#include <math.h>
 #include <gsl/gsl_rng.h>
 #include <gsl/gsl_siman.h>
 #include <gsl/gsl_randist.h>
@@ -77,7 +78,7 @@ double energy(void *xp) {
 }
 
 double* orthogonal_to(const double *a, const double *b, int n) {
-  double *result = CALLOC(n, double);
+  double *result = (double *)calloc(n, sizeof(double));
   
   // Calculate dot products
   double dot_a_b = 0.0;
@@ -91,7 +92,7 @@ double* orthogonal_to(const double *a, const double *b, int n) {
     result[i] = b[i] - (dot_a_b / dot_a_a) * a[i];
   }
 
-  // Normalizing the result (to make sure it's a unit vector)
+  // Normalizing the result
   double norm = 0.0;
   for (int i = 0; i < n; i++) {
     norm += result[i] * result[i];
@@ -138,6 +139,324 @@ void siman_step(const gsl_rng *r, void *xp, double step_size) {
   free(w);
 }
 
+double dot_product(const double *a, const double *b, int n) {
+  double dot = 0.0;
+  for (int i = 0; i < n; i++) {
+    dot += a[i] * b[i];
+  }
+  return dot;
+}
+
+void siman_step_ortho(const gsl_rng *r, void *xp, double step_size) {
+  int n = env->samples->dimension;
+  double *h = (double *)xp;
+  
+  // Get a random unit vector u orthogonal to h
+  double *u = (double *)calloc(n, sizeof(double));
+  // todo change it cones. algorithm
+  do {
+    gsl_ran_dir_nd(r, n, u);
+  } while(fabs(dot_product(h, u, n)) < 1e-10); // ensure u is not parallel to h
+
+  // Rotate h in the plane defined by h and u by step_size radians
+  // First, project h onto the orthogonal plane
+  double *perpendicular = orthogonal_to(u, h, n);
+  
+  // Apply the rotation
+  double cos_angle = cos(step_size);
+  double sin_angle = sin(step_size);
+  for (int i = 0; i < n; ++i) {
+      h[i] = cos_angle * perpendicular[i] + sin_angle * u[i];
+  }
+
+  // Normalize the resulting vector to ensure it's a unit vector
+  double norm_h = 0.0;
+  for (int i = 0; i < n; ++i) {
+      norm_h += h[i] * h[i];
+  }
+  norm_h = sqrt(norm_h);
+  for (int i = 0; i < n; ++i) {
+      h[i] /= norm_h;
+  }
+
+  free(u);
+  free(perpendicular);
+}
+
+// Function to create a random 2D rotation matrix within an n-dimensional space
+gsl_matrix *random_2d_rotation_matrix(const gsl_rng *r, int n, double angle) {
+    gsl_matrix *R = gsl_matrix_alloc(n, n);
+    gsl_matrix_set_identity(R);
+
+    int i = gsl_rng_uniform_int(r, n);
+    int j = gsl_rng_uniform_int(r, n);
+    while (i == j) {  // Ensure i and j are different for a valid 2D plane
+        j = gsl_rng_uniform_int(r, n);
+    }
+
+    // Set the 2D rotation components within the larger matrix
+    gsl_matrix_set(R, i, i, cos(angle));
+    gsl_matrix_set(R, i, j, -sin(angle));
+    gsl_matrix_set(R, j, i, sin(angle));
+    gsl_matrix_set(R, j, j, cos(angle));
+
+    return R;
+}
+
+// Function to rotate the hyperplane normal vector 'h' by 'step_size' degrees
+void siman_rotate_step(const gsl_rng *r, void *xp, double step_size) {
+    int n = env->samples->dimension;  // Assuming 'env' and 'samples' are defined and accessible
+    double *h = (double *) xp;
+    // double angle = step_size * M_PI / 180.0;  // Convert step size from degrees to radians
+  double angle = step_size * gsl_rng_uniform(r) * 2.0 * M_PI; // Random angle between 0 and 2*PI
+
+    // Print the hyperplane normal vector before rotation
+    // printf("Hyperplane normal vector before rotation:\n");
+    // for (int i = 0; i < n; ++i) {
+    //     printf("%g ", h[i]);
+    // }
+    // printf("\n");
+
+    // Create a random 2D rotation matrix within the n-dimensional space
+    gsl_matrix *R = random_2d_rotation_matrix(r, n, angle);
+
+    // Create a GSL vector that views the data in 'h'
+    gsl_vector_view h_view = gsl_vector_view_array(h, n);
+
+    // Create a temporary GSL vector to hold the result
+    gsl_vector *temp_result = gsl_vector_alloc(n);
+
+    // Multiply the normal vector 'h' by the rotation matrix and store the result in 'temp_result'
+    gsl_blas_dgemv(CblasNoTrans, 1.0, R, &h_view.vector, 0.0, temp_result);
+
+    // Copy the result from 'temp_result' back to 'h'
+    gsl_vector_memcpy(&h_view.vector, temp_result);
+
+    // Print the hyperplane normal vector after rotation
+    // printf("Hyperplane normal vector after rotation:\n");
+    // for (int i = 0; i < n; ++i) {
+    //     printf("%g ", h[i]);
+    // }
+    // printf("\n");
+
+    // Clean up
+    gsl_vector_free(temp_result);
+    gsl_matrix_free(R);
+}
+
+void siman_step_raw(const gsl_rng *r, void *xp, double step_size) {
+    int n = env->samples->dimension;
+    double *h = (double *)xp;
+
+    // 1. Find a random vector on the hyperplane
+    double *random_vector = (double *)calloc(n, sizeof(double));
+    gsl_ran_dir_nd(r, n, random_vector);
+
+    // 2. Normalize the random vector's magnitude
+    double norm_random_vector = 0.0;
+    for (int i = 0; i < n; ++i) {
+        norm_random_vector += random_vector[i] * random_vector[i];
+    }
+    norm_random_vector = sqrt(norm_random_vector);
+    for (int i = 0; i < n; ++i) {
+        random_vector[i] /= norm_random_vector;
+    }
+
+    // 3. Add it to the hyperplane
+    for (int i = 0; i < n; ++i) {
+        h[i] += random_vector[i] * step_size;
+    }
+
+    // 4. Normalize the hyperplane
+    double norm_h = 0.0;
+    for (int i = 0; i < n; ++i) {
+        norm_h += h[i] * h[i];
+    }
+    norm_h = sqrt(norm_h);
+    for (int i = 0; i < n; ++i) {
+        h[i] /= norm_h;
+    }
+
+    free(random_vector);
+}
+
+void siman_step_cosine(const gsl_rng *r, void *xp, double step_size) {
+    int n = env->samples->dimension;
+    double *h = (double *)xp;
+
+    // Compute the unit vector parallel to h
+    double *u = (double *)calloc(n, sizeof(double));
+    double norm_h = 0.0;
+    for (int i = 0; i < n; ++i) {
+        norm_h += h[i] * h[i];
+    }
+    norm_h = sqrt(norm_h);
+    for (int i = 0; i < n; ++i) {
+        u[i] = h[i] / norm_h;
+    }
+
+    // Generate a random vector
+    double *random_vector = (double *)calloc(n, sizeof(double));
+    gsl_ran_dir_nd(r, n, random_vector);
+
+    // Compute a vector perpendicular to h
+    double *uperp = (double *)calloc(n, sizeof(double));
+    double dot_product = 0.0;
+    for (int i = 0; i < n; ++i) {
+        dot_product += random_vector[i] * u[i];
+    }
+    for (int i = 0; i < n; ++i) {
+        uperp[i] = random_vector[i] - dot_product * u[i];
+    }
+
+    // Normalize uperp
+    double norm_uperp = 0.0;
+    for (int i = 0; i < n; ++i) {
+        norm_uperp += uperp[i] * uperp[i];
+    }
+    norm_uperp = sqrt(norm_uperp);
+    for (int i = 0; i < n; ++i) {
+        uperp[i] /= norm_uperp;
+    }
+
+    // Form the new vector h
+    double cos_theta = step_size;
+    double sin_theta = sqrt(1 - cos_theta * cos_theta);
+    for (int i = 0; i < n; ++i) {
+        h[i] = cos_theta * u[i] + sin_theta * uperp[i];
+    }
+
+    // Normalize the resulting vector h
+    norm_h = 0.0;
+    for (int i = 0; i < n; ++i) {
+        norm_h += h[i] * h[i];
+    }
+    norm_h = sqrt(norm_h);
+    for (int i = 0; i < n; ++i) {
+        h[i] /= norm_h;
+    }
+
+    free(u);
+    free(random_vector);
+    free(uperp);
+}
+
+double calculate_tan(const gsl_vector *a, const gsl_vector *b) {
+    double dot_product;
+    gsl_blas_ddot(a, b, &dot_product);  // Compute the dot product of a and b
+
+    // Compute the norms of a and b
+    double norm_a = gsl_blas_dnrm2(a);
+    double norm_b = gsl_blas_dnrm2(b);
+
+    // Compute the cosine of the angle
+    double cos_theta = dot_product / (norm_a * norm_b);
+
+    // Ensure the cosine is not zero to prevent division by zero
+    if (cos_theta == 0) {
+        fprintf(stderr, "Vectors are orthogonal. Tangent is undefined.\n");
+        return HUGE_VAL;  // Return a large number to indicate an undefined tangent
+    }
+
+    // Compute the sine of the angle using the Pythagorean identity
+    double sin_theta = sqrt(1.0 - cos_theta * cos_theta);
+
+    // Compute the tangent of the angle
+    double tan_theta = sin_theta / cos_theta;
+
+    return tan_theta;
+}
+
+// Function to create a Givens rotation matrix
+gsl_matrix *create_givens_rotation(int n, int i, int j, double angle) {
+    gsl_matrix *G = gsl_matrix_alloc(n, n);
+    if (!G) {
+        fprintf(stderr, "Failed to allocate memory for matrix G\n");
+        exit(EXIT_FAILURE);
+    }
+    gsl_matrix_set_identity(G);
+    gsl_matrix_set(G, i, i, cos(angle));
+    gsl_matrix_set(G, i, j, -sin(angle));
+    gsl_matrix_set(G, j, i, sin(angle));
+    gsl_matrix_set(G, j, j, cos(angle));
+    return G;
+}
+
+// The Aguilera-Perez Algorithm for computing the rotation matrix
+gsl_matrix *aguilera_perez_rotation_matrix(const gsl_vector *v, int n) {
+    gsl_matrix *M = gsl_matrix_alloc(n, n);
+    if (!M) {
+        fprintf(stderr, "Failed to allocate memory for matrix M\n");
+        exit(EXIT_FAILURE);
+    }
+    gsl_matrix_set_identity(M);
+
+    for (int r = 2; r <= n-1; ++r) {
+        for (int c = n; c >= r; --c) {
+            double tan_angle = calculate_tan(v, v); // Placeholder for actual computation
+            double angle = atan(tan_angle);
+            gsl_matrix *G = create_givens_rotation(n, c-1, c, angle);
+
+            // Update M by multiplying with G
+            gsl_matrix *temp_M = gsl_matrix_alloc(n, n);
+            if (!temp_M) {
+                fprintf(stderr, "Failed to allocate memory for temporary matrix temp_M\n");
+                gsl_matrix_free(M);
+                gsl_matrix_free(G);
+                exit(EXIT_FAILURE);
+            }
+            gsl_blas_dgemm(CblasNoTrans, CblasNoTrans, 1.0, M, G, 0.0, temp_M);
+            gsl_matrix_memcpy(M, temp_M);
+
+            gsl_matrix_free(G);
+            gsl_matrix_free(temp_M);
+        }
+    }
+
+    return M;
+}
+
+// Function to rotate the hyperplane normal vector 'h' by 'step_size' degrees
+void siman_rotate_step_paper(const gsl_rng *r, void *xp, double step_size) {
+    int n = env->samples->dimension;  // Using the placeholder 'env' variable
+    double *h = (double *) xp;
+    double angle = step_size * gsl_rng_uniform(r) * 2.0 * M_PI; // Random angle between 0 and 2*PI
+
+    // Create a random 2D rotation matrix within the n-dimensional space
+    gsl_matrix *R = random_2d_rotation_matrix(r, n, angle);
+
+    // Create a GSL vector that views the data in 'h'
+    gsl_vector_view h_view = gsl_vector_view_array(h, n);
+
+    // Create a temporary GSL vector to hold the result
+    gsl_vector *temp_result = gsl_vector_alloc(n);
+    if (!temp_result) {
+        fprintf(stderr, "Failed to allocate memory for vector temp_result\n");
+        gsl_matrix_free(R);
+        exit(EXIT_FAILURE);
+    }
+
+    // Multiply the normal vector 'h' by the rotation matrix and store the result in 'temp_result'
+    gsl_blas_dgemv(CblasNoTrans, 1.0, R, &h_view.vector, 0.0, temp_result);
+
+    // Copy the result from 'temp_result' back to 'h'
+    gsl_vector_memcpy(&h_view.vector, temp_result);
+
+    // Clean up
+    gsl_vector_free(temp_result);
+    gsl_matrix_free(R);
+}
+
+double hplane_dist_spatial(void *xp, void *yp) {
+  double *h1 = xp, *h2 = yp;
+  int n = env->samples->dimension;
+  gsl_vector x1 = gsl_vector_view_array(h1, n).vector;
+  gsl_vector x2 = gsl_vector_view_array(h2, n).vector;
+  gsl_vector_sub(&x1, &x2); //x1 -= x2
+  double dist = gsl_blas_dnrm2(&x1);
+  // printf("h1 = %p, h2 = %p, dist = %f\n", (void *)h1, (void *)h2, dist);
+  return dist;
+}
 
 // 2. Step function that uses history average
 void take_step_average(const gsl_rng *r, void *xp, double step_size) {
@@ -336,7 +655,7 @@ double *single_siman_run(unsigned int *seed, int iter_lim, env_t *env_p, double 
   gsl_rng *r = gsl_rng_alloc(gsl_rng_taus);
   gsl_rng_set(r, rand());
 
-  gsl_siman_solve(r, h0, energy, take_step_average_threshold, hplane_dist, print_hplane, NULL, NULL, NULL, (env->samples->dimension)*sizeof(double), params);
+  gsl_siman_solve(r, h0, energy, siman_step_cosine, hplane_dist, print_hplane, NULL, NULL, NULL, (env->samples->dimension)*sizeof(double), params);
 
   double *random_solution = blank_solution(env->samples);
   double random_objective_value = hyperplane_to_solution(h0, random_solution, env);
@@ -359,7 +678,7 @@ double *single_siman_run_param(unsigned int *seed, int iter_lim, env_t *env_p, d
   gsl_rng *r = gsl_rng_alloc(gsl_rng_taus);
   gsl_rng_set(r, rand());
 
-  gsl_siman_solve(r, h0, energy, siman_step, hplane_dist, print_hplane, NULL, NULL, NULL, (env->samples->dimension)*sizeof(double), p);
+  gsl_siman_solve(r, h0, energy, siman_step_cosine, hplane_dist, print_hplane, NULL, NULL, NULL, (env->samples->dimension)*sizeof(double), p);
 
   double *random_solution = blank_solution(env->samples);
   double random_objective_value = hyperplane_to_solution(h0, random_solution, env);
