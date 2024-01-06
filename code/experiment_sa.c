@@ -167,11 +167,12 @@ exp_res_t experiment(int param_setting)
 
 // seeting k 3 and step3 witl yield reach of 217.
   int sa_param_cnt = 3;
-  int sa_n_tries[] = {200, 800, 3200};
-  int sa_iters_fixed_t[] = {500, 2000, 8000};
+  int sa_n_tries[] = {2000, 800, 3200};
+  int sa_iters_fixed_t[] = {2000, 2000, 8000};
   double sa_k[] = {3.0, 3.0, 10.0};
-  double sa_step_size[] = {3.0, 10000.0, 100000000.0};
+  double sa_step_size[] = {0.01, 10000.0, 100000000.0};
 
+// step 0.01 k 3 returns 203
 
   for (int s = 0; s < SAMPLE_SEEDS; s++)
   {
@@ -182,7 +183,7 @@ exp_res_t experiment(int param_setting)
 
     FILE *infile;
 
-    infile = fopen("../../data/south-german-credit/SouthGermanCredit.dat", "r");
+    infile = fopen("../../data/south-german-credit/SouthGermanCredit-training.dat", "r");
     samples = read_binary_samples(infile);
     fclose(infile);
 
@@ -201,6 +202,13 @@ exp_res_t experiment(int param_setting)
 
       unsigned int *seed = mip_seeds + t;
 
+
+      gurobi_param p = {param_setting, 0, 0, GRB_INFINITY, -1, 0.15, -1};
+      h = single_gurobi_run(seed, 180000, 1200, &env, &p);
+      printf("Objective = %0.3f\n", h[0]);
+      exit(0);
+
+
       // grid search...
       for (int i_n_tries = 0; i_n_tries < sa_param_cnt; i_n_tries++)
       {
@@ -215,16 +223,34 @@ exp_res_t experiment(int param_setting)
                      sa_n_tries[i_n_tries], sa_iters_fixed_t[i_iters_fixed], sa_step_size[i_step_size],
                      sa_k[i_k], T_INITIAL, MU_T, T_MIN);
               // printf("Random Integer: %d\n", randomIntegerInRange(1, 10000));
-              // printf("Random Double: %.2f\n", randomDoubleInRange(1.0, 10000.0));
 
               // 3. Call the genetic_algorithm_run function
               // double *best_solution = genetic_algorithm_run(seed, &env);
               double *best_solution = tabu_search_run(seed, &env, NULL);
+
+
+if (best_solution) {
+    printf("Best solution found:\n");
+
+    // Loop through the elements of the array
+    for (int i = 0; i < 5; i++) {
+        printf("%f ", best_solution[i]);
+    }
+    printf("\n");
+
+    // Once you are done with 'best_solution', don't forget to free the memory
+    free(best_solution);
+} else {
+    printf("Error: best_solution is NULL\n");
+}
+
+
+
               // double *best_solution = pso_run(seed, &env);
 
               // 4. Handle or use the result
-              printf("Best solution found:\n");
-              // h = single_siman_run_param(seed, 0, &env, NULL, params); // todo
+              // printf("Best solution found:\n");
+              h = single_siman_run_param(seed, 0, &env, best_solution, params); // todo
               exit(0);
               return;
             }

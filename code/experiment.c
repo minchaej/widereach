@@ -295,7 +295,7 @@ exp_res_t experiment(int param_setting) {
      * crop mapping  .99 (76, 0.974359); 
      * */
     env.params->theta = 0.9;
-    double lambda_factor = 1;
+    double lambda_factor = 10;
     //env.params->theta = 0.99;
     env.params->branch_target = 0.0;
     env.params->iheur_method = deep;
