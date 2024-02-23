@@ -191,7 +191,7 @@ exp_res_t experiment(int param_setting)
         // fopen("../../data/wine-quality/winequality-white-training.dat", "r"); 
         //  fopen("../../data/crops/small-sample.dat", "r");
           fopen("../../data/crop-classes/small-sample-broadleaf.dat", "r");
-          // fopen("../../data/crop-classes/small-sample-canola.dat", "r");
+        // fopen("../../data/crop-classes/small-sample-canola.dat", "r");
 
 
     samples = read_binary_samples(infile);
