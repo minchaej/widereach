@@ -680,15 +680,15 @@ double *single_siman_run_param(unsigned int *seed, int iter_lim, env_t *env_p, d
 
 // Genetic Algorithm
 
-#define POP_SIZE 1000
-#define MUTATION_RATE 0.01
-#define CROSSOVER_RATE 0.7
-#define MAX_GENERATIONS 1000
+#define POP_SIZE 300
+#define MUTATION_RATE 1.2
+#define CROSSOVER_RATE 0.1
+#define MAX_GENERATIONS 400
 
 gsl_rng *r;
 
 double fitness(double *h) {
-    double value = hyperplane_to_solution(h, NULL, env);
+    double value = obj_new(h, env);
     
     if (isnan(value) || isinf(value)) {
         return DBL_MAX;  // Assign a large penalty for invalid values
@@ -791,12 +791,12 @@ double* genetic_algorithm_run(unsigned int *seed, env_t *env_p) {
 // #define NEIGHBORHOOD_SIZE 10
 // #define MAX_ITERATIONS 1000
 
-#define TABU_TENURE 1
-#define NEIGHBORHOOD_SIZE 100
-#define MAX_ITERATIONS 10000
+#define TABU_TENURE 10
+#define NEIGHBORHOOD_SIZE 300
+#define MAX_ITERATIONS 1500
 
 double tabu_objective(double *h) {
-    return -hyperplane_to_solution(h, NULL, env);
+    return -obj_new(h, env);
 }
 
 void generate_neighbor(double *h, double *neighbor) {
@@ -881,11 +881,11 @@ double *tabu_search_run(unsigned int *seed, env_t *env_p, double *h0)
 // #define C1 1.5  // cognitive/personal weight
 // #define C2 1.5  // social weight
 
-#define SWARM_SIZE 300
-#define MAX_ITERATIONS 10000
-#define W 0.8  // inertia weight
-#define C1 1.8  // cognitive/personal weight
-#define C2 1.8  // social weight
+#define SWARM_SIZE 600
+#define MAX_ITERATIONS 1000
+#define W 0.7  // inertia weight
+#define C1 1.5  // cognitive/personal weight
+#define C2 1.9  // social weight
 
 
 gsl_rng *r;
@@ -899,7 +899,7 @@ typedef struct {
 } Particle;
 
 double pso_objective(double *h) {
-    return -hyperplane_to_solution(h, NULL, env);
+    return -obj_new(h, env);
 }
 
 void update_velocity_and_position(Particle *particle, double *gbest, int dimension) {

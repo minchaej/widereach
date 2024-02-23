@@ -110,12 +110,12 @@ exp_res_t experiment(int param_setting)
    * south german credit  .9 (2, 1) (originally said 0.95 here)
    * crop mapping  .99 (76, 0.974359);
    * */
-  env.params->theta = 0.9;
-  double lambda_factor = 1;
+  env.params->theta = 0.99;
+  double lambda_factor = 100;
   // env.params->theta = 0.99;
   env.params->branch_target = 0.0;
   env.params->iheur_method = deep;
-  int n = 4000;
+  int n = 400;
   // env.params->lambda = 100 * (n + 1);
   env.params->rnd_trials = 10000;
   // env.params->rnd_trials_cont = 10;
@@ -165,12 +165,13 @@ exp_res_t experiment(int param_setting)
   double *precisions = CALLOC(ntests, double);
   int k = 0;
 
-// seeting k 3 and step3 witl yield reach of 217.
+// seeting k 3 and step3 witl yield reach of 217. <-- old
+// new seeting is that since we are using cosine step, we have to make our k and stepsize way smaller
   int sa_param_cnt = 3;
   int sa_n_tries[] = {200, 800, 3200};
-  int sa_iters_fixed_t[] = {500, 2000, 8000};
-  double sa_k[] = {3.0, 3.0, 10.0};
-  double sa_step_size[] = {3.0, 10000.0, 100000000.0};
+  int sa_iters_fixed_t[] = {1000, 2000, 8000};
+  double sa_k[] = {1.0, 3.0, 10.0};
+  double sa_step_size[] = {0.01, 10000.0, 100000000.0};
 
 
   for (int s = 0; s < SAMPLE_SEEDS; s++)
@@ -179,10 +180,20 @@ exp_res_t experiment(int param_setting)
     printf("Sample seed: %lu\n", samples_seeds[s]);
 
     samples_t *samples;
+    // samples = random_samples(n, n / 2, dimension);
 
     FILE *infile;
 
-    infile = fopen("../../data/south-german-credit/SouthGermanCredit.dat", "r");
+    infile = 
+        // fopen("../../data/south-german-credit/SouthGermanCredit.dat", "r");
+    	  // fopen("../../data/breast-cancer/wdbc.dat", "r");
+        // fopen("../../data/wine-quality/red-cross/winequality-red.dat", "r");
+        // fopen("../../data/wine-quality/winequality-white-training.dat", "r"); 
+        //  fopen("../../data/crops/small-sample.dat", "r");
+          fopen("../../data/crop-classes/small-sample-broadleaf.dat", "r");
+          // fopen("../../data/crop-classes/small-sample-canola.dat", "r");
+
+
     samples = read_binary_samples(infile);
     fclose(infile);
 
@@ -218,13 +229,13 @@ exp_res_t experiment(int param_setting)
               // printf("Random Double: %.2f\n", randomDoubleInRange(1.0, 10000.0));
 
               // 3. Call the genetic_algorithm_run function
+              // h = single_siman_run_param(seed, 0, &env, NULL, params); // todo
               // double *best_solution = genetic_algorithm_run(seed, &env);
               double *best_solution = tabu_search_run(seed, &env, NULL);
               // double *best_solution = pso_run(seed, &env);
 
               // 4. Handle or use the result
               printf("Best solution found:\n");
-              // h = single_siman_run_param(seed, 0, &env, NULL, params); // todo
               exit(0);
               return;
             }

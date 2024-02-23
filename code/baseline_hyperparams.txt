@@ -1,0 +1,26 @@
+German
+SA: 199
+  int sa_param_cnt = 3;
+  int sa_n_tries[] = {200, 800, 3200};
+  int sa_iters_fixed_t[] = {1000, 2000, 8000};
+  double sa_k[] = {1.0, 3.0, 10.0};
+  double sa_step_size[] = {0.01, 10000.0, 100000000.0};
+
+PSO: 201
+#define SWARM_SIZE 600
+#define MAX_ITERATIONS 1000
+#define W 0.7  // inertia weight
+#define C1 1.5  // cognitive/personal weight
+#define C2 1.9  // social weight
+
+GA: 192
+#define POP_SIZE 300
+#define MUTATION_RATE 1.2
+#define CROSSOVER_RATE 0.1
+#define MAX_GENERATIONS 400
+
+
+TA: 196
+#define TABU_TENURE 10
+#define NEIGHBORHOOD_SIZE 300
+#define MAX_ITERATIONS 1500

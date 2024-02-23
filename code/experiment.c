@@ -294,19 +294,19 @@ exp_res_t experiment(int param_setting) {
      * south german credit  .9 (2, 1) (originally said 0.95 here)
      * crop mapping  .99 (76, 0.974359); 
      * */
-    env.params->theta = 0.9;
-    double lambda_factor = 1;
+    env.params->theta = 0.99;
+    double lambda_factor = 100;
     //env.params->theta = 0.99;
     env.params->branch_target = 0.0;
     env.params->iheur_method = deep;
-    int n = 4000;
+    int n = 400;
     // env.params->lambda = 100 * (n + 1); 
     env.params->rnd_trials = 10000;
     // env.params->rnd_trials_cont = 10;
     env.params->rnd_trials_cont = 0;
     
     //size_t dimension = param_setting;
-    size_t dimension = 32;
+    size_t dimension = 8;
     
     clusters_info_t clusters[2];
     // int n = pow10quick(dimension);
@@ -379,7 +379,7 @@ exp_res_t experiment(int param_setting) {
     
         samples_t *samples;
 
-        //samples = random_samples(n, n / 2, dimension);
+        samples = random_samples(n, n / 2, dimension);
         // samples = random_sample_clusters(clusters);
 	//samples = random_simplex_samples(&simplex_info);
         infile =
@@ -405,7 +405,7 @@ exp_res_t experiment(int param_setting) {
 	  // fopen("../../data/wine-quality/white-cross/winequality-white-1.dat", "r");
 	  fopen("../../data/south-german-credit/SouthGermanCredit.dat", "r");
 	  //fopen("../../data/crops/small-sample.dat", "r");
-	samples = read_binary_samples(infile);
+	// samples = read_binary_samples(infile);
 	fclose(infile);
 	//write_samples(samples, "2cluster4000.dat");
 	//exit(0);
@@ -454,9 +454,13 @@ exp_res_t experiment(int param_setting) {
 	    
 	    //Training results testing:
 	    if(param_setting <= 1) {
+        	    printf("asdf\n");
 	      //use gurobi
 	      gurobi_param p = {param_setting, 0, 0, GRB_INFINITY, -1, 0.15, -1};
+        	    printf("as222222cccdf\n");
 	      h = single_gurobi_run(seed, 120000, 1200, &env, &p);
+        	    printf("as222222df\n");
+
 	      // h = single_siman_run(seed, 0, &env, h+1);
 	      // h = single_run(seed, 120000, &env);
 
