@@ -193,7 +193,6 @@ exp_res_t experiment(int param_setting)
           fopen("../../data/crop-classes/small-sample-broadleaf.dat", "r");
         // fopen("../../data/crop-classes/small-sample-canola.dat", "r");
 
-
     samples = read_binary_samples(infile);
     fclose(infile);
 
